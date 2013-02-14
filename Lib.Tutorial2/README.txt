@@ -10,9 +10,9 @@ Tutorial2 メソッドを定義する
 3. Konoha言語への登録
 
 1. Konoha言語の型, C言語の型
-C/C++言語でMiniKonoha言語のメソッドを記述する場合、最も気を付けなければならない点はMiniKonoha言語とC言語の間でデータ表現の違いです。
-まずはじめにMiniKonoha言語とC言語でのデータ表現の違いについて説明します。
-MiniKonoha言語ではプログラム記述にはboolean型、int型, String型, Array型などが利用できます。また、Type.Floatパッケージを利用することでfloat型の利用も可能となっています。
+C/C++言語でKonoha言語のメソッドを記述する場合、最も気を付けなければならない点はKonoha言語とC言語の間でデータ表現の違いです。
+まずはじめにKonoha言語とC言語でのデータ表現の違いについて説明します。
+Konoha言語ではプログラム記述にはboolean型、int型, String型, Array型などが利用できます。また、Type.Floatパッケージを利用することでfloat型の利用も可能となっています。
 
 TODO
 Konohaのデータ型とスタックからのアクセス方法

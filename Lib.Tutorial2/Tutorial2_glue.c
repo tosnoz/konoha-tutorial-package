@@ -24,9 +24,9 @@
 
 /* ************************************************************************ */
 
-#include <minikonoha/minikonoha.h>
-#include <minikonoha/klib.h>
-#include <minikonoha/import/methoddecl.h>
+#include <konoha3/konoha.h>
+#include <konoha3/klib.h>
+#include <konoha3/import/methoddecl.h>
 #include <stdio.h>
 
 #ifdef __cplusplus
