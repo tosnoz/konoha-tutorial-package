@@ -14,6 +14,13 @@ Tutorial3 クラスを定義する
 
 
 あとで書く
+Tutorial3_Init() でそのオブジェクトの NULL オブジェクトが用意される
+malloc(2) 系は使うべきではない
+-----
+Memory obtained by malloc function allocates a memory region that is not managed by GC.
+Therefore, sometimes malloc function leads to unexpected fragmentation.
+So, you may want to create konoha-object without malloc.
+-----
 
 4. 注意事項
 C言語で定義されたクラスはFinalなクラスとして定義されます。

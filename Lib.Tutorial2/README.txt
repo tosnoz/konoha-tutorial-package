@@ -1,8 +1,8 @@
 Tutorial2 メソッドを定義する
 
-このパッケージではパッケージ内でC/C++で記述されたメソッドを定義する方法について述べます。
+Tutorial2ではパッケージ内でC/C++で記述されたメソッドを定義する方法について述べます。
 
-このパッケージでコールバック関数を対象外としています。複雑なケースはLib.Tutorial5を参照してください。
+Tutorial2ではコールバック関数を対象としていません。複雑なケースはLib.Tutorial5を参照してください。
 
 目次
 1. Konoha言語の型, C言語の型
@@ -16,7 +16,14 @@ Konoha言語ではプログラム記述にはboolean型、int型, String型, Arr
 
 TODO
 Konohaのデータ型とスタックからのアクセス方法
-KReturnマクロ
+K_FRAME_MEMBER	- defined in "include/konoha3/konoha.h"
+
+KReturnマクロ - defined in "include/konoha3/konoha.h"
+KReturn(o):	オブジェクト
+KReturnUnboxValue(d):	 基本型
+KReturnVoid():	なし
+KReturnWith(VAL, CLEANUP) - JavaScript.Array/Array_glue.c, JavaScript.Regexp/Regexp_glue.c で使用されている
+KReturnFloatValue(c):	float型(TODO check 受け取る側は Type.Float パッケージが必要？)
 
 2. バインド関数の作成
 実行中のKonohaはバインド関数を呼び出し、バインド関数からC/C++ライブラリ関数を呼び出すという流れになります。
