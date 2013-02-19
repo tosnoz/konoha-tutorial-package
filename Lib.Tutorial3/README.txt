@@ -37,3 +37,6 @@ class MyClass /* exnteds CDefinedClass */ {
     }
 }
 
+
+TODO
+Tutorial2 では System クラスへの登録例となっているが、通常は各クラスのネームスペースへ登録する

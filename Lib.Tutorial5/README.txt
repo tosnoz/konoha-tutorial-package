@@ -34,3 +34,26 @@ void qsort_r(void *base, size_t nmemb, size_t size,
   void *arg);
 
 
+
+
+TODO
+	Object は KUnsafeFieldSet() マクロを使用、基本型は直接代入する(binding ルール)
+	BEGIN_UnusedStack(lsfp);
+	KClass *returnType = kMethod_GetReturnType(cbArg->kcb->method);
+	KUnsafeFieldSet(lsfp[0].asObject, K_NULL);
+	KUnsafeFieldSet(lsfp[1].intValue, evd);
+	KUnsafeFieldSet(lsfp[2].intValue, event);
+	KUnsafeFieldSet(lsfp[3].asObject, (kObject *)cbArg->arg);
+
+	KStackSetFuncAll(lsfp, KLIB Knull(kctx, returnType), 0/*UL*/, cbArg->kcb, 3);
+	KStackCall(lsfp);
+	END_UnusedStack();
+
+	*_Free() 内では "KFieldInit(parent, parent->object, K_NULL);" は不要
+	∵ GCがやるから
+
+	Konoha Object については *_Reftrace() で KRefTrace() - KRefTraceNullable() ではない
+	malloc したものに KRefTraceNullable() を使う
+
+
+2. コールバックメソッドの実装

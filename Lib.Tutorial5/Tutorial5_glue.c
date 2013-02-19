@@ -33,25 +33,39 @@
 extern "C" {
 #endif
 
-/* ------------------------------------------------------------------------ */
-/* Tutorial5 */
-static KMETHOD System_hello_world(KonohaContext *kctx, KonohaStack *sfp)
+kFunc cbFunc;
+
+static int qsort_r_compar(void *base, size_t nmemb, size_t size,
+	int (*compar)(const void *, const void *, void *), void *arg)
 {
-	int n = sfp[1].intValue;
-	kMethod *mtd = NULL;
+
 	BEGIN_UnusedStack(lsfp);
-	KUnsafeFieldSet(lsfp[K_CALLDELTA+0].asObject, K_NULL);
-	KUnsafeFieldSet(lsfp[K_CALLDELTA+1].intValue, n);
+	KUnsafeFieldSet(lsfp[0].asObject, K_NULL);
+	KUnsafeFieldSet(lsfp[1].intValue, n);
 	{
 		KStackSetMethodAll(lsfp,
 				KLIB Knull(kctx, KClass_Int), /* Default Object of ReturnType */
 				0/*UL*/, /* line number */
-				mtd, /* call method */
+				cbFunc, /* call method */
 				1 /* argc */);
 		KStackCall(lsfp);
 	}
 	END_UnusedStack();
 	int ret = lsfp[0].intValue;
+
+
+}
+
+/* ------------------------------------------------------------------------ */
+/* Tutorial5 */
+//## int System.qsort_r(Array base, Func[int, Object, Object] compar);
+static KMETHOD System_qsort_r(KonohaContext *kctx, KonohaStack *sfp)
+{
+	int n = sfp[1].intValue;
+	kFunc *cbFunc = konoha_method;	//TODO
+
+
+
 	KReturnUnboxValue(ret);
 }
 
