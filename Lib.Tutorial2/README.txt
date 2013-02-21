@@ -1,5 +1,8 @@
 Tutorial2 メソッドを定義する
 
+TODO 「バインド関数」→「グルー関数」
+先頭で用語の説明
+
 Tutorial2ではパッケージ内でC/C++で記述されたメソッドを定義する方法について述べます。
 
 Tutorial2ではコールバック関数を対象としていません。複雑なケースはLib.Tutorial5を参照してください。
@@ -27,6 +30,11 @@ KReturnFloatValue(c):	float型(TODO check 受け取る側は Type.Float パッ�
 
 2. バインド関数の作成
 実行中のKonohaはバインド関数を呼び出し、バインド関数からC/C++ライブラリ関数を呼び出すという流れになります。
+これがバインド関数の実装の手順です。
+ 1. Konoha スタックからの引数の取得
+ 2. C/C++ 外部ライブラリ関数を呼び出し
+ 3. 返り値をKonoha言語のデータ型からC言語の型へ変換する。
+
 それではC言語で定義された関数に含まれるhello_world関数をSystemクラスのhello_worldメソッドにバインドする例を示します。
 
 今回の例で利用するhello_world関数は"Hello world"とn回出力する関数で、以下のインタフェースを持ちます。
@@ -34,27 +42,34 @@ KReturnFloatValue(c):	float型(TODO check 受け取る側は Type.Float パッ�
 
  この関数を呼び出すためのバインド関数は以下のようになります。
 
+/*
 1 KMETHOD System_hello_world(KonohaContext *kctx, KonohaStack *sfp)
 2 {
 3     int n = sfp[1].intValue;
 4     int ret = hello_world(n);
 5     KReturnUnboxValue(ret);
 6 }
+*/
+
 
  まず１行目では。System_hello_world関数を開始しています。
 この関数がC/C++ライブラリ関数hello_worldを呼び出すためのバインド関数です。
  後に説明しますが、バインド関数はすべてこの関数と同じインタフェース(引数にKonohaContext*型, KonohaStack*型、返り値がKMETHODの関数型)を持っています。
  ２、３行目ではKonoha VMから受け取った引数(Konoha言語のint型)をC言語のint型に変換して、ローカル変数nに保持します。 ４行目では、そのローカル変数を引数として、hello_world関数を呼び出します。返り値は、ローカル変数retに保存されます。 ５行目では、ローカル変数retをKonoha言語のint型に変換して、VMに返しています。
 
-以上は非常に簡単な例ですが、これがバインド関数の役割すべてです。すなわち、
- 1. C/C++ライブラリ関数を呼び出す。
- 2. 引数、返り値をKonoha言語のデータ型からC言語の型へ変換する。
-の２つがバインド関数の役割となります。 
+TODO sfp[1].asBytes の説明
+System.read(fd, buf, size);
+sfp[0]: this
+sfp[1]: int f = sfp[1].intValue;
+sfp[2]: kBytes *buf = sfp[2].asBytes;
+sfp[3]: int s = sfp[3].intValue;
+
+TODO 返り値説明追加、メンバ変数とのデータのやりとり
 
 
 3. Konoha言語への登録
 先ほど示したSystem_hello_world関数はC言語の世界で定義された関数です。
-Konohaで利用できるようにするためにはKonoha側に、バインド関数で利用する引数、返り値の情を通知する必要があります。
+Konohaで利用できるようにするためにはKonoha側に、バインド関数で利用する引数、返り値の情報を通知する必要があります。
 バインド関数のKonohaへの登録はpackupNameSpace関数にて行われます。
 
 1 static kbool_t Tutorial2_PackupNameSpace(KonohaContext *kctx, kNameSpace *ns, int option, KTraceInfo *trace)
@@ -68,10 +83,10 @@ Konohaで利用できるようにするためにはKonoha側に、バインド�
 8 }
 
 3行目から5行目までがこのパッケージで定義されるメソッドのリストを示しています。
-今回の例では以下のメソッドを1つ定義しています。
+今回の例では以下のKonohaメソッドを1つ定義しています。
 @Public @Immutable int System.hello_world(int n);
 
-メソッドを登録するデータ構造MethodDataは以下のフォーマットとなっています。
+Konohaメソッドを登録するデータ構造MethodDataは以下のフォーマットとなっています。
 アノテーション , バインド関数のアドレス , 返り値の型 , Thisの型 , メソッド名 , 引数の数, 第1引数の型, 第1引数の型, 第2引数の型, 第2引数の型...
 
 最後にkNameSpace_LoadMethodData()によりメソッドの定義リストをNameSpaceに登録することでメソッドの呼び出しが可能となります。
@@ -98,4 +113,11 @@ _Virtual  ... @Virtual
 _Ignored  ... @IgnoredOverride
 
 FIXME 各アノテーションの説明
+
+    _Im：thisが変化しない
+    _Const：引数が同じ場合，同じ物を返す
+    _Coercion：引数が自動的にキャストされる
+    _Public：クラス外部からのアクセスを許可する
+    _Static：インスタンス化せずにメソッドを呼び出すことを許可する
+    _Private：クラス外部からのアクセスを禁止する
 
