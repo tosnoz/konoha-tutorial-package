@@ -9,9 +9,14 @@ Konoha 言語 外部ライブラリ バインディング チュートリアル
 # はじめに
   このチュートリアルでは、Konoha 言語から [libevent(http://libevent.org/)] を利用するために作成した src/package-devel/Lib.Libevent パッケージを例に、外部C/C++ライブラリを Konoha 言語にバインドする方法を例を示しながら説明していきます。
 
-  例には行番号が振られていますが、github の konoha-project/konoha3 リポジトリ
+  また、Lib.Libevent パッケージの作成方針として、
+* 移植性を保持するため、元の API に近いものとする
+という方針で作成しています。
+オブジェクト指向の形態には変更してはいますが、それ以外の引数は同じ形になるようにしています。
+
+  チュートリアルに登場する例には行番号が振られていますが、github の konoha-project/konoha3 リポジトリ
 >   [commit 66103b28762cede82a9844a7963c7d2727578b66](https://github.com/konoha-project/konoha3/tree/66103b28762cede82a9844a7963c7d2727578b66 "ベースソース")
-  のソースを使用します。
+  のソースを使用しています。実際のソースを眺めながら、このチュートリアルを読み進める際には、 commit ID に注意してください。
 
 
 
@@ -103,18 +108,19 @@ Konoha メソッドからグルー関数が呼ばれた際にメソッドの引�
     182          KReturnUnboxValue(ret);
     183  }
 
-まず 177 行目では、cevent_event_add() 関数を開始しています。
-グルー関数はすべてこの関数と同じインタフェース(引数にKonohaContext*型, KonohaStack*型、返り値がKMETHODの関数型)を持っています。
+177 行から、cevent_event_add() 関数を開始します。
+グルー関数はすべて同じインタフェース(引数にKonohaContext*型, KonohaStack*型、返り値がKMETHODの関数型)を持っています。
 
 179, 180 行目では Konoha VM から受け取った引数(Konoha 言語の Object 型) を参照するため C の 構造体ポインタ型に変換して保持します。
 
 グルー関数の第二引数である Konoha スタックは次の図のようになっています
-sfp[3]: 第三引数
-sfp[2]: 第二引数
-sfp[1]: 第一引数
-sfp[0]: this
-TODO	中田さんの図に差し替え
+*sfp[0]: this
+*sfp[1]: 第一引数
+*sfp[2]: 第二引数
+*sfp[3]: 第三引数
 
+TODO	中田さんの図に差し替え
+![Alt test](http://konoha.sourceforge.jp/d/lib/exe/detail.php?id=guide%3Akpdg&media=guide:2-2.png "Konoha Stack image")
 
 181行目では、そのローカル変数を引数として、event_add() 関数を呼び出します。返り値は、ローカル変数 ret に保存されます。
 
@@ -270,8 +276,7 @@ Konoha 言語で利用できるようにするためには Konoha 側に、グ�
 
 
 Konohaメソッドを登録するデータ構造MethodDataは以下のフォーマットとなっています。
-
-アノテーション , グルー関数のアドレス , 返り値の型 , Thisの型 , メソッド名 , 引数の数, 第1引数の型, 第1引数の型, 第2引数の型, 第2引数の型...
+* アノテーション , グルー関数のアドレス , 返り値の型 , Thisの型 , メソッド名 , 引数の数, 第1引数の型, 第1引数の型, 第2引数の型, 第2引数の型...
 
 600 行で cevent コンストラクタを、601行で event_add() メソッドをそれぞれ次のように定義しています。
     @Public cevent cevent(cevent_base, int, int, eventCBArg);
@@ -325,17 +330,64 @@ C で定義されたクラスをスクリプト側で継承したい場合には
 
 
 # Generics
+libevent ではイベントによりコールバック関数の引数が異なっています。
+
+グルー関数の C から Konoha のコールバックメソッドを呼び出すためには、コールバックメソッドの定義に Func 型を使用し、その引数の型を Generics で定義する必要があります。
+
+
+    src/package-devel/Lib.Libevent_glue.c
+    578          //eventCB_p
+    579          kparamtype_t eventCB_p[] = {{KType_Int, 0}, {KType_Int, 0}, {KType_Object, 0}};
+    580          KClass *ceventCBfunc = KLIB KClass_Generics(kctx, KClass_Func, KType_void, 3, eventCB_p);
+    581          int KType_ceventCBfunc = ceventCBfunc->typeId;
+    
+    (snip)
+    
+    591          KDEFINE_METHOD MethodData[] = {
+    
+    (snip)
+    
+
+    614                  // eventCBArg
+    615                  _Public, _F(eventCBArg_new), KType_eventCBArg, KType_eventCBArg, KMethodName_("new"), 2, KType_ceventCBfunc, KFieldName_("konoha_CB"), KType_Object, KFieldName_("CBarg"),
+
+    
+    (snip)
+    
+    627          };
+    628          KLIB kNameSpace_LoadMethodData(kctx, ns, MethodData, trace);
+
+579 - 581 が コールバック用 Func 型の定義になります。
+1. 579 行で Func の引数を定義しています。この場合は Func[int, int, Object] に相当します。
+1. 580 行で KLIB KClass_Generics() を呼ぶことにより、Func の Generics 型を Konoha のクラスとして登録しています。 KLIB KClass_Generics() の引数は
+* コンテキスト, クラス, 返り値の型, 引数の数, 引数の定義テーブル
+となります。
+1. 581 行では、[Konoha言語への登録] で説明した MethodData[] へ登録するための型情報を取得し、615 行でそれを使用しています。
+
+この例では eventCBArg クラスのコンストラクタを定義していますが、これを呼ぶのは
+
+    src/package-devel/Lib.Libevent_kick.k
+    60          event(event_base evbase, int evd, int evCat, Func[void, int, int, Object] cb, Object cbArg) {
+    61                  cev = new cevent(evbase.cevbase, evd, evCat, new eventCBArg(cb, cbArg));
+    62                  this.evBase = evbase;
+    63          }
+
+の 61 行のようになります。
 
 
 
+# libevent コールバックから Konoha コールバックメソッドの呼び出し
+libevent コールバックは C の関数しかサポートしていないため、libevent コールバックとして Konoha メソッドを直接設定できません。
+そのため、
+1. libevent から C のコールバック関数を呼び出される
+1. C コールバック関数から Konoha メソッドを呼び出す
+という二段階の手続きが必要となります。
+
+
+## Konoha コールバックメソッドの引数の保持
 
 
 
-
-
-
-# C/C++ 構造体をクラスとして定義する
-  Konoha
 
 
 
