@@ -384,18 +384,82 @@ libevent コールバックは C の関数しかサポートしていないた�
 という二段階の手続きが必要となります。
 
 
-## Konoha コールバックメソッドの引数の保持
+
+## グルー関数から Konoha メソッドの呼び出し手順
+グルー関数から Konoha メソッドを呼び出すためには、スタックを設定する必要があります。
+libevent のコールバック関数である cevent_callback_1st() から Konoha コールバックメソッドを呼び出す手順を例に説明していきます。
+
+    src/package-devel/Lib.Libevent_glue.c
+    122  static void cevent_callback_1st(evutil_socket_t evd, short event, void *
+ arg) {
+    123          keventCBArg *cbArg = arg;
+    124          KonohaContext *kctx = cbArg->kctx;
+    125
+    126          BEGIN_UnusedStack(lsfp);
+    127          KClass *returnType = kMethod_GetReturnType(cbArg->kcb->method);
+    128          KUnsafeFieldSet(lsfp[0].asObject, K_NULL);
+    129          lsfp[1].intValue = evd;
+    130          lsfp[2].intValue = event;
+    131          KUnsafeFieldSet(lsfp[3].asObject, (kObject *)cbArg->arg);
+    132
+    133          KStackSetFuncAll(lsfp, KLIB Knull(kctx, returnType), 0/*UL*/, cbArg->kcb, 3);
+    134          KStackCall(lsfp);
+    135          END_UnusedStack();
+    136  }
+
+126 行で BEGIN_UnusedStack() マクロにて、メソッド呼び出しのためのスタックの準備を行なっています。
+128 - 130 行でスタックに設定しています。128 行は通常のメソッド呼び出しでは this オブジェクトが設定されていますが、この場合は NULL オブジェクトを設定しています。
+コールバックメソッドが this オブジェクトを使わない場合であれば、この設定で問題ありません。
+
+そして 133 行の KStackSetFuncAll() マクロで呼び出しのためのスタック設定を完了し、134 行の KStackCall() マクロにて Konoha メソッドを呼び出します。
+
+Konoha メソッドから戻ると END_UnusedStack() マクロによりスタックを呼び出し前の状態に戻します。
 
 
+## Konoha コールバックメソッドへ渡す引数の保持
+libevent のコールバックは次のように定義されています。
 
+    /usr/include/event2/event.h
+    typedef void (*event_callback_fn)(evutil_socket_t, short, void *);
 
+コールバック関数の第三引数は、event_new() の際に指定したものが渡されます。
+コールバック関数では、この引数により内部処理で行なうべきことを判断します。
 
+Konoha のコールバックメソッドでも同様にするため、libevent コールバック関数の引数には
+* Konoha コールバックメソッド
+* コールバックメソッドに渡す第三引数
+をパックした eventCBArg クラスを定義して、それを渡すようにしています。
+※Konoha の Func 型には、メソッドだけではなく env が定義されており、本来はそちらを使用するべきであり、今後修正する予定です。
 
-
-
-
-
-
+    src/package-devel/Lib.Libevent_glue.c
+    122  static void cevent_callback_1st(evutil_socket_t evd, short event, void *arg) {
+    123          keventCBArg *cbArg = arg;
+    124          KonohaContext *kctx = cbArg->kctx;
+    125
+    126          BEGIN_UnusedStack(lsfp);
+    127          KClass *returnType = kMethod_GetReturnType(cbArg->kcb->method);
+    128          KUnsafeFieldSet(lsfp[0].asObject, K_NULL);
+    129          lsfp[1].intValue = evd;
+    130          lsfp[2].intValue = event;
+    131          KUnsafeFieldSet(lsfp[3].asObject, (kObject *)cbArg->arg);
+    132
+    133          KStackSetFuncAll(lsfp, KLIB Knull(kctx, returnType), 0/*UL*/, cbArg->kcb, 3);
+    134          KStackCall(lsfp);
+    135          END_UnusedStack();
+    136  }
+    
+    (snip)
+    
+    164  static KMETHOD cevent_new(KonohaContext *kctx, KonohaStack *sfp)
+    165  {
+    
+    (snip)
+    
+    170          keventCBArg *cbArg = (keventCBArg *)sfp[4].asObject;    //deliver callback method
+    171
+    172          ev->event = event_new(cEvent_base->event_base, evd, event, cevent_callback_1st, cbArg);
+    173          KReturn(ev);
+    174  }
 
 
 # Konoha スクリプトからパッケージをロードする際の内部動作
@@ -432,3 +496,22 @@ libevent コールバックは C の関数しかサポートしていないた�
 "パッケージ名"_kick.kのスクリプトがロードされます。(今回の例ではLibevent_kick.k)
 拡張ライブラリ内でCで記述されたメソッドのラッパーメソッドなどはここに記述されます。
 
+
+
+# cmake 設定ファイルの用意
+cmake 用に CMakeLists.txt を作成します。
+
+    src/package-devel/Lib.Libevent/CMakeLists.txt
+    1  cmake_minimum_required(VERSION 2.6)
+    2  find_package(LibEvent)
+    3  if(EVENT_FOUND)
+    4          include_directories(${EVENT_INCLUDE_DIR})
+    5          set(PACKAGE_EXTRA_LIBRARY ${EVENT_LIBRARIES})
+    6          set(PACKAGE_SOURCE_CODE Libevent_glue.c)
+    7          set(PACKAGE_SCRIPT_CODE Libevent_glue.k Libevent_kick.k)
+    8          add_konoha_package(Lib.Libevent)
+    9  endif()
+
+2 行で libevent に関する情報を取得しています。
+これは cmake/FindLibEvent.cmake において定義されています。
+6 - 7 行で C のソースファイルと、スクリプトファイルを指定し、8 行で Konoha package として追加します。
