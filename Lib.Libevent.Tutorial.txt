@@ -127,8 +127,8 @@ KReturn マクロは "include/konoha3/konoha.h" で定義されており、主�
 
 
 ## グルー関数におけるメンバ変数へのアクセス
-
-C バインドにおけるクラス構造の定義は次のように行ないます。
+### Konoha クラス構造体の定義
+C バインドにおける Konoha クラス構造の定義(以下の例は cevent クラスの構造)は次のように行ないます。
 
     src/package-devel/Lib.Libevent_glue.c
     45  typedef struct cevent {
@@ -136,9 +136,82 @@ C バインドにおけるクラス構造の定義は次のように行ないま
     47          struct event *event;
     48  } kcevent;
 
-cevent クラスのメンバ変数は event のみですが、Konoha言語のオブジェクトから直接変更することはできないため、グルー関数を経由してのアクセスとなります。
+kObjectHeader を構造の先頭に配置し、以降に必要な変数を配置していきます。
+cevent クラスのメンバ変数 event は Konoha 言語のオブジェクトから直接変更することはできないため、グルー関数を経由してのアクセスとなります。
 
-次の例はコンストラクタの例ですが、アクセス方法はメソッドでも同様です。
+
+### Konoha の名前空間への登録
+C における定義を Konoha クラスとして動作させるために、Konoha の名前空間への登録を行ないます。
+
+    src/package-devel/Lib.Libevent_glue.c
+    517          // cevent
+    518          KDEFINE_CLASS defcevent = {0};
+    519          SETSTRUCTNAME(defcevent, cevent);
+    520          defcevent.cflag     = KClassFlag_Final;
+    521          defcevent.init      = cevent_Init;
+    522  //      defcevent.reftrace  = cevent_Reftrace;
+    523          defcevent.free      = cevent_Free;
+    524          KClass *ceventClass = KLIB kNameSpace_DefineClass(kctx, ns, NULL, &defcevent, trace);
+
+519 行の SETSTRUCTNAME マクロで cevent クラスへの cevent 構造体の関連付けを行ないます。
+
+520 行で、このクラスの属性を指定します。
+KClassFlag_* は konoha.h に定義されているので、そちらを参照してフラグを設定します。
+
+TODO KClassFlag_* の一覧を記述する？
+
+524 行の KLIB kNameSpace_DefineClass() で Konoha クラス名前空間への登録を行なっています。
+
+#### クラス初期化関数
+521 行は、cevent クラスの初期化関数 cevent_Init() を指定しています。
+
+クラス初期化関数は、次の場合に呼び出されます。
+*パッケージがロードされた際に各クラスの NULL オブジェクトを生成する
+*オブジェクトが new される際、コンストラクタグルー関数を呼び出す前の初期化を行なう
+
+    src/package-devel/Lib.Libevent_glue.c
+    142  static void cevent_Init(KonohaContext *kctx, kObject *o, void *conf)
+    143  {
+    144          struct cevent *ev = (struct cevent *) o;
+    145          ev->event = NULL;
+    146  }
+
+#### reftrace 関数
+TODO 要確認
+522 行は cevent クラスでは不要なためコメントアウトされていますが、GC による参照トレースに対する応答が必要なメンバを持つ場合は必要となります。
+
+例えば、eventCBArg クラスでは次のように定義しています。
+
+    src/package-devel/Lib.Libevent_glue.c
+    363  static void eventCBArg_Reftrace(KonohaContext *kctx, kObject *o, KObjectVisitor *visitor)
+    364  {
+    365          struct eventCBArg *cba = (struct eventCBArg *) o;
+    366          KRefTrace(cba->kcb);
+    367          KRefTrace(cba->arg);
+    368  }
+
+KRefTrace マクロは NULL ポインタが許容されない場合に使用します。
+NULL ポインタを許容する場合は、 KRefTraceNullable マクロを使用します。
+
+#### free 関数
+523 行は、cevent クラスのオブジェクトが解放される時に呼ばれる cevent_Free() 関数を指定しています。
+
+cevent クラスでは libevent の event_free() を実施する必要があるので、153 行で呼び出しています。
+
+    src/package-devel/Lib.Libevent_glue.c
+    148  static void cevent_Free(KonohaContext *kctx, kObject *o)
+    149  {
+    150          struct cevent *ev = (struct cevent *) o;
+    151
+    152          if(ev->event != NULL) {
+    153                  event_free(ev->event);
+    154                  ev->event = NULL;
+    155          }
+    156  }
+
+
+###メンバ変数へのアクセス
+次の例は cevent クラスのコンストラクタの例ですが、メソッドでもアクセス方法は同じです。
 
     src/package-devel/Lib.Libevent_glue.c
     164  static KMETHOD cevent_new(KonohaContext *kctx, KonohaStack *sfp)
@@ -154,7 +227,8 @@ cevent クラスのメンバ変数は event のみですが、Konoha言語のオ
     174  }
 
 166 行目で this オブジェクトの参照をオブジェクト構造体ポインタ ev に取得しています。
-このコンストラクタでは、event_new の結果を ev->event に保存することが目的ですが、それを 172 行目で行ない、このオブジェクトを 173 行目で返してコンストラクタの終了です。
+このコンストラクタでは、event_new の結果を ev->event に保存することが目的ですが、それを 172 行目で行なっています。
+そして、このオブジェクトを 173 行目で返してコンストラクタの終了となります。
 
 
 
@@ -164,27 +238,32 @@ Konoha 言語で利用できるようにするためには Konoha 側に、グ�
 グルー関数の Konoha への登録は Libevent_PackupNameSpace() 関数にて行われます。
 ※Libevent_PackupNameSpace() の登録は後述する「Konoha スクリプトからパッケージをロードする際の内部動作」にて説明します
 
+    src/package-devel/Lib.Libevent_glue.c
     505  static kbool_t Libevent_PackupNameSpace(KonohaContext *kctx, kNameSpace 
 *ns, int option, KTraceInfo *trace)
     506  {
-
+    
     (snip)
-
+    
+    570          int KType_cevent = ceventClass->typeId;
+    
+    (snip)
+    
     591          KDEFINE_METHOD MethodData[] = {
-
+    
     (snip)
-
+    
     600                  _Public, _F(cevent_new), KType_cevent, KType_cevent, KMethodName_("new"), 4, KType_cevent_base, KFieldName_("cevent_base"), KType_Int, KFieldName_("evd"), KType_Int, KFieldName_("event"), KType_eventCBArg, KFieldName_("CBarg"),
     601                  _Public, _F(cevent_event_add), KType_Int, KType_cevent, KMethodName_("event_add"), 1, KType_ctimeval, KFieldName_("timeval"),
-
+    
     (snip)
-
+    
     626                  DEND, /* <= sentinel */
     627          };
     628          KLIB kNameSpace_LoadMethodData(kctx, ns, MethodData, trace);
-
+    
     (snip)
-
+    
     661
     662          return true;
     663  }
@@ -202,22 +281,50 @@ Konohaメソッドを登録するデータ構造MethodDataは以下のフォー�
 最後にkNameSpace_LoadMethodData()によりメソッドの定義リストをNameSpaceに登録することでメソッドの呼び出しが可能となります。
 
 _Public はメソッドに付与されたアノテーションを意味します。
+
 メソッドには必ず0個以上のアノテーションを付与します。今回の場合、@Public @Immutableのアノテーションを付与しています。
+
 メソッドに付与可能なアノテーションは以下のとおりです。
-_Public   ... @Public    ：クラス外部からのアクセスを許可する
-_Private  ... @Private   ：クラス外部からのアクセスを禁止する
-_Final    ... @Final     ：オーバーライド禁止
-_Const    ... @Const     ：引数が同じ場合，同じ物を返す
-_Static   ... @Static    ：インスタンス化せずにメソッドを呼び出すことを許可する
-_Im       ... @Immutable ：thisが変化しない
-_Coercion ... @Coercion  ：引数が自動的にキャストされる
-_Hidden   ... @Hidden
-_Virtual  ... @Virtual
-_Ignored  ... @IgnoredOverride
+* _Public   ... @Public    ：クラス外部からのアクセスを許可する
+* _Private  ... @Private   ：クラス外部からのアクセスを禁止する
+* _Final    ... @Final     ：オーバーライド禁止
+* _Const    ... @Const     ：引数が同じ場合，同じ物を返す
+* _Static   ... @Static    ：インスタンス化せずにメソッドを呼び出すことを許可する
+* _Im       ... @Immutable ：thisが変化しない
+* _Coercion ... @Coercion  ：引数が自動的にキャストされる
+* _Hidden   ... @Hidden
+* _Virtual  ... @Virtual
+* _Ignored  ... @IgnoredOverride
+
+
+## C によるグルークラスの制約
+### C で定義するグルークラスは Final なクラスとして定義しなければない
+
+C で定義されたクラスをスクリプト側で継承したい場合には Libevent_kick.k における定義のようにラップするオブジェクトを作成することで回避する方法をとります。
+
+    src/package-devel/Lib.Libevent_kick.k
+    32  class event_base {
+    33          cevent_base cevbase;
+    34          @Private Map/*TODO Map[event]*/ evMap;
+    35
+    36          event_base() {
+    37                  cevbase = new cevent_base();
+    38                  evMap = new Map();
+    39          }
+    40  
+    41          @Public int event_dispatch() {
+    42                  return cevbase.event_dispatch();
+    43          }
+    
+    (snip)
+    
+    52  }
+
+### 構造体はオブジェクトとしてラップする必要がある。
 
 
 
-
+# Generics
 
 
 
