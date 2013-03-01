@@ -29,14 +29,13 @@ Lib.Libevent パッケージの作成にあたり、
 C/C++ で Konoha 言語のメソッドを記述する場合、最も気を付けなければならない点は Konoha 言語と C 言語の間でデータ表現の違いです。
 
 Konoha 言語のプログラム記述には基本型として _boolean_ 型、_int_ 型, _String_ 型, _Array_ 型などが利用できます。
-また、_Type.Float_ パッケージを利用することで _float_ 型の利用も可能となっています。
+また、 _Type.Float_ パッケージを利用することで _float_ 型の利用も可能となっています。
 
 Konoha メソッドからグルー関数が呼ばれた際には、メソッドの引数を取得しなければなりませんが、この時に Konoha 言語の型と C 言語の型の橋渡しを行なうため、_include/konoha3/konoha.h_ において定義されているアクセス構造体 _struct KonohaValueVar_ を経由してアクセスします。
 
 166 - 170 行が実際の使用例となります。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     164  static KMETHOD cevent_new(KonohaContext *kctx, KonohaStack *sfp)
     165  {
     166          struct cevent *ev = (struct cevent *) sfp[0].asObject;
@@ -49,11 +48,11 @@ _src/package-devel/Lib.Libevent_glue.c_
     173          KReturn(ev);
     174  }
 
-様々な型、クラスを取得するためのメンバが用意されています。用意されているメンバと対応する Konoha の型、クラスについては _include/konoha3/konoha.h_ を参照してください。
+様々な型、クラスに対応するためのメンバが用意されています。用意されているメンバと対応する Konoha の型、クラスについては _include/konoha3/konoha.h_ を参照してください。
 
 
 ## グルー関数
-実行中の Konoha は Konoha メソッドとしてグルー関数を呼び出し、グルー関数から対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出すという流れになります。
+実行中の Konoha は ユーザーが定義した Konoha スクリプトから Konoha メソッドとしてグルー関数を呼び出し、グルー関数から対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出すという流れになります。
 
 グルー関数では、以下のことを行います。
 
@@ -61,12 +60,11 @@ _src/package-devel/Lib.Libevent_glue.c_
 1. C/C++ 外部ライブラリ関数を呼び出し
 1. 戻り値を Konoha 言語のデータ型から C 言語の型へ変換する。
 
-それでは libevent ライブラリで定義されている _event_add()_ 関数を _cevent_ クラスの _event_add()_ メソッドにバインドする例を示します。
+それでは libevent ライブラリで定義されている _event_add()_ 関数を _cevent クラス_ の _event_add() メソッド_ にバインドする例を示します。
 
 _event_add()_ 関数を呼び出すグルー関数は以下のようになります。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     177  static KMETHOD cevent_event_add(KonohaContext *kctx, KonohaStack* sfp)
     178  {
     179          kcevent *kcev = (kcevent *)sfp[0].asObject;
@@ -99,8 +97,7 @@ _KReturn_ マクロは _include/konoha3/konoha.h_ で定義されており、主
 ### Konoha クラス構造体の定義
 C バインドにおける Konoha クラス構造の定義(以下の例は cevent クラスの構造)は次のように行ないます。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     45  typedef struct cevent {
     46          kObjectHeader h;
     47          struct event *event;
@@ -114,8 +111,7 @@ _cevent クラス_ のメンバ変数 _event_ は Konoha 言語のオブジェ�
 ### Konoha の名前空間への登録
 C における定義を Konoha クラスとして動作させるために、Konoha の名前空間への登録を行ないます。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     517          // cevent
     518          KDEFINE_CLASS defcevent = {0};
     519          SETSTRUCTNAME(defcevent, cevent);
@@ -143,8 +139,8 @@ _KClassFlag_\*_ は _include/konoha3/konoha.h_ に定義されているので、
 
 _cevent_Init()_ は 142 行から定義されていますが、第二引数の kObject ポインタを使用して、このオブジェクト(_this オブジェクト_)のメンバを初期化します。
 
-_src/package-devel/Lib.Libevent_glue.c_
 
+    src/package-devel/Lib.Libevent_glue.c
     142  static void cevent_Init(KonohaContext *kctx, kObject *o, void *conf)
     143  {
     144          struct cevent *ev = (struct cevent *) o;
@@ -155,8 +151,7 @@ _src/package-devel/Lib.Libevent_glue.c_
 初期化以外の場合でオブジェクトを設定する際には __KFieldSet マクロ__ を使用します。
 
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     346  static void eventCBArg_Init(KonohaContext *kctx, kObject *o, void *conf)
     347  {
     348          struct eventCBArg *cbarg = (struct eventCBArg *) o;
@@ -171,8 +166,7 @@ _src/package-devel/Lib.Libevent_glue.c_
 
 例えば _eventCBArg クラス_ では次のように定義しています。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     363  static void eventCBArg_Reftrace(KonohaContext *kctx, kObject *o, KObjectVisitor *visitor)
     364  {
     365          struct eventCBArg *cba = (struct eventCBArg *) o;
@@ -188,8 +182,7 @@ _NULL ポインタ_ を許容している場合は、 _KRefTraceNullable マク�
 
 _cevent クラス_ ではオブジェクト解放にあたり libevent の _event_free()_ を実行する必要があるので、153 行で呼び出しています。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     148  static void cevent_Free(KonohaContext *kctx, kObject *o)
     149  {
     150          struct cevent *ev = (struct cevent *) o;
@@ -204,8 +197,7 @@ _src/package-devel/Lib.Libevent_glue.c_
 ###メンバ変数へのアクセス
 次の例は _cevent クラス_ のコンストラクタでのメンバ変数へのアクセス例ですが、一般のメソッドでもアクセス方法は同じです。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     164  static KMETHOD cevent_new(KonohaContext *kctx, KonohaStack *sfp)
     165  {
     166          struct cevent *ev = (struct cevent *) sfp[0].asObject;
@@ -234,8 +226,7 @@ Konoha 言語でメソッドとして利用可能にするためには Konoha �
 
 ※ _Libevent_PackupNameSpace()_ の詳細は後述する「Konoha スクリプトからパッケージをロードする際の内部動作」にて説明します。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     505  static kbool_t Libevent_PackupNameSpace(KonohaContext *kctx, kNameSpace *ns, int option, KTraceInfo *trace)
     506  {
     
@@ -298,8 +289,7 @@ _KDEFINE_METHOD MethodData[]_ の最後の要素には、626 行のように終�
 ### グルークラスは Final なクラスとして定義しなければない
 C で定義されたグルークラスをスクリプト側で継承したい場合には Libevent_kick.k における _event_base クラス_ 定義のようにラップするオブジェクトを作成することで回避する方法をとります。
 
-_src/package-devel/Lib.Libevent_kick.k_
-
+    src/package-devel/Lib.Libevent_kick.k
     32  class event_base {
     33          cevent_base cevbase;
     34          @Private Map/*TODO Map[event]*/ evMap;
@@ -323,8 +313,7 @@ libevent ではイベントの種類によりコールバック関数の引数�
 
 グルー関数から Konoha のコールバックメソッドを呼び出すためには、コールバックメソッドの定義に _Func_ 型を使用し、その引数の型を _Generics_ で定義しなければなりません。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     578          //eventCB_p
     579          kparamtype_t eventCB_p[] = {{KType_Int, 0}, {KType_Int, 0}, {KType_Object, 0}};
     580          KClass *ceventCBfunc = KLIB KClass_Generics(kctx, KClass_Func, KType_void, 3, eventCB_p);
@@ -360,8 +349,7 @@ _KLIB KClass_Generics()_ の引数は _(コンテキスト, クラス, 戻り値
 
 この例では _eventCBArg_ クラスのコンストラクタを定義していますが、呼び出しは次のようになります。
 
-_src/package-devel/Lib.Libevent_kick.k_
-
+    src/package-devel/Lib.Libevent_kick.k
     60          event(event_base evbase, int evd, int evCat, Func[void, int, int, Object] cb, Object cbArg) {
     61                  cev = new cevent(evbase.cevbase, evd, evCat, new eventCBArg(cb, cbArg));
     62                  this.evBase = evbase;
@@ -384,7 +372,7 @@ libevent コールバックは C の関数を呼び出します。libevent コ�
 グルー関数から Konoha メソッドを呼び出すためには、Konoha スタックを設定する必要があります。
 libevent のコールバック関数である _cevent_callback_1st()_ から Konoha コールバックメソッドを呼び出す手順を例に説明していきます。
 
-_src/package-devel/Lib.Libevent_glue.c_
+    src/package-devel/Lib.Libevent_glue.c
 
     122  static void cevent_callback_1st(evutil_socket_t evd, short event, void *arg) {
     123          keventCBArg *cbArg = arg;
@@ -414,8 +402,7 @@ _src/package-devel/Lib.Libevent_glue.c_
 ## Konoha コールバックメソッドへ渡す引数
 libevent のコールバックは次のように定義されています。
 
-_/usr/include/event2/event.h_
-
+    /usr/include/event2/event.h
     typedef void (*event_callback_fn)(evutil_socket_t, short, void *);
 
 libevent コールバック関数の第三引数は、event_new() の際に指定したものが渡されます。
@@ -436,8 +423,7 @@ Konoha のコールバックメソッドでも同様にするため、libevent �
 
 という手順で _Konoha コールバックメソッド_ へ引数を渡しています。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     122  static void cevent_callback_1st(evutil_socket_t evd, short event, void *arg) {
     123          keventCBArg *cbArg = arg;
     124          KonohaContext *kctx = cbArg->kctx;
@@ -489,8 +475,7 @@ _src/package-devel/Lib.Libevent_glue.c_
 パッケージに新たに定数などを定義する際には _Tutorial1_PackupNameSpace()_ 関数を利用します。多くのパッケージではメソッド定義や文法定義などを行います。
 他のパッケージにシンボルを公開する場合には _Tutorial1_ExportNameSpace()_ 関数を利用します。定数定義などでこの関数を利用しています。
 
-_src/package-devel/Lib.Libevent_glue.c_
-
+    src/package-devel/Lib.Libevent_glue.c
     670  KDEFINE_PACKAGE *Libevent_Init(void)
     671  {
     672      static KDEFINE_PACKAGE d = {0};
@@ -511,8 +496,7 @@ _"パッケージ名"_kick.k_ のスクリプトがロードされます。(今�
 Konoha は ビルドシステムとして cmake を使用しています。
 このため Lib.Libevent パッケージの CMakeLists.txt を作成します。
 
-_src/package-devel/Lib.Libevent/CMakeLists.txt_
-
+    src/package-devel/Lib.Libevent/CMakeLists.txt
     1  cmake_minimum_required(VERSION 2.6)
     2  find_package(LibEvent)
     3  if(EVENT_FOUND)
