@@ -8,7 +8,7 @@ Lib.Libevent パッケージの作成にあたり、
 * 移植性を保持するため、元の API に近いものとする
 
 という方針で作成しています。
-オブジェクト指向の形態に変更していますが、それ以外の引数は同じ形になるようにしています。
+オブジェクト指向の形態に変更していますが、それ以外の引数は同じ形になるように作成しています。
 
 本チュートリアルに登場する例には行番号が振られていますが、github の konoha-project/konoha3 リポジトリ
 >   [commit 66103b28762cede82a9844a7963c7d2727578b66](https://github.com/konoha-project/konoha3/tree/66103b28762cede82a9844a7963c7d2727578b66 "ベースソース")
@@ -17,7 +17,7 @@ Lib.Libevent パッケージの作成にあたり、
 
 
 # 用語の説明
-1. __ライブラリ関数__：	C/C++ ライブラリ
+1. __ライブラリ関数__：	外部 C/C++ ライブラリの関数
 1. __グルー関数__：	Konoha 言語用グルー関数。Lib.Libevent パッケージでは Libevent_glue.c 内で定義されている。C 言語の関数であるが、Konoha 言語からはメソッドとして呼ばれる。
 1. __Konoha メソッド__：	Konoha 言語のメソッド
 1. __Konoha オブジェクト__：	Konoha 言語のオブジェクト
@@ -26,12 +26,14 @@ Lib.Libevent パッケージの作成にあたり、
 
 # メソッドを定義する
 ## Konoha 言語の型と C 言語の型
-C/C++ で Konoha 言語のメソッドを記述する場合、最も気を付けなければならない点は Konoha 言語と C 言語の間でデータ表現の違いです。
+C/C++ で Konoha 言語のメソッドを記述する場合、最も気を付けなければならない点は Konoha 言語と C 言語の間でのデータの受け渡しです。
 
-Konoha 言語のプログラム記述には基本型として _boolean_ 型、_int_ 型, _String_ 型, _Array_ 型などが利用できます。
+Konoha 言語のプログラム記述には基本型として _boolean_ 型、 _int_ 型, _String_ 型, _Array_ 型などが利用できます。
 また、 _Type.Float_ パッケージを利用することで _float_ 型の利用も可能となっています。
 
-Konoha メソッドからグルー関数が呼ばれた際には、メソッドの引数を取得しなければなりませんが、この時に Konoha 言語の型と C 言語の型の橋渡しを行なうため、_include/konoha3/konoha.h_ において定義されているアクセス構造体 _struct KonohaValueVar_ を経由してアクセスします。
+また、 Kohoha オブジェクトの受け渡しも必要となります。
+
+Konoha メソッドからグルー関数が呼ばれた際には、C 言語の世界で Konoha メソッドの引数を取得しなければなりませんが、Konoha 言語の型と C 言語の型の橋渡しを行なうために、 _include/konoha3/konoha.h_ にて定義されているアクセス構造体 _struct KonohaValueVar_ を経由してアクセスします。
 
 166 - 170 行が実際の使用例となります。
 
@@ -48,21 +50,26 @@ Konoha メソッドからグルー関数が呼ばれた際には、メソッド�
     173          KReturn(ev);
     174  }
 
-様々な型、クラスに対応するためのメンバが用意されています。用意されているメンバと対応する Konoha の型、クラスについては _include/konoha3/konoha.h_ を参照してください。
+_struct KonohaValueVar_ には様々な型、クラスに対応するためのメンバが用意されています。
+用意されているメンバと対応する Konoha の型、クラスについては _include/konoha3/konoha.h_ で定義されている _struct KonohaValueVar_ を参照してください。
 
 
 ## グルー関数
-実行中の Konoha は ユーザーが定義した Konoha スクリプトから Konoha メソッドとしてグルー関数を呼び出し、グルー関数から対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出すという流れになります。
+実行中の Konoha は
 
-グルー関数では、以下のことを行います。
+1. ユーザーが定義した Konoha スクリプトから Konoha メソッドとしてグルー関数を呼び出し
+1. グルー関数が対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出す
 
-1. Konoha スタックからの引数の取得
+という流れになります。
+
+呼び出されたグルー関数の内部では、以下のことを行います。
+
+1. Konoha スタックからメソッドとして受け取った引数の取得
 1. C/C++ 外部ライブラリ関数を呼び出し
-1. 戻り値を Konoha 言語のデータ型から C 言語の型へ変換する。
+1. 戻り値を C 言語の型から Konoha 言語のデータ型 へ変換しリターンする
 
-それでは libevent ライブラリで定義されている _event_add()_ 関数を _cevent クラス_ の _event_add() メソッド_ にバインドする例を示します。
-
-_event_add()_ 関数を呼び出すグルー関数は以下のようになります。
+それでは libevent ライブラリで定義されている _event_add()_ 関数を _cevent クラス_ の _event_add() メソッド_ としてバインドする例を示します。
+_event_add()_ ライブラリ関数を呼び出すためのグルー関数 _cevent_event_add()_ の定義は以下のようになります。
 
     src/package-devel/Lib.Libevent_glue.c
     177  static KMETHOD cevent_event_add(KonohaContext *kctx, KonohaStack* sfp)
@@ -73,16 +80,17 @@ _event_add()_ 関数を呼び出すグルー関数は以下のようになりま
     182          KReturnUnboxValue(ret);
     183  }
 
-177 行から _cevent_event_add()_ 関数が開始します。
-グルー関数はすべて同じインタフェース(引数に _KonohaContext\*_ 型, _KonohaStack\*_ 型、戻り値が _KMETHOD_ の関数型)を持っています。
+177 行が _cevent_event_add()_ 関数のインタフェースとなりますが、グルー関数はすべて同じインタフェース (引数に _KonohaContext \*_ 型, _KonohaStack \*_ 型、戻り値が _KMETHOD_ の関数型)を持っています。
 
-179, 180 行では Konoha VM から受け取った引数(Konoha 言語の _Object_ 型) を参照するため C 言語の構造体ポインタ型に変換して保持します。
-
-グルー関数の第二引数である Konoha スタックは次の図のようになっています。
+第一引数の _KonohaContext \*ctx_ には、Konoha コンテキストが渡されます。
+第二引数の _KonohaStack \*sfp_ には、Konoha スタックが渡されます。
+Konoha スタックは次の図のようになっています。
 
 ![Alt text](./konohaStackImage.png "Konoha Stack image")
 
-181行目では、その引数を使用して、_event_add()_ ライブラリ関数を呼び出してます。
+179, 180 行では Konoha VM が Konoha スタックに設定しているメソッドの引数(Konoha 言語の _Object_ 型) を参照するため C 言語の構造体ポインタ型に変換して保持します。
+
+181行目では、その Konoha オブジェクトのメンバを _event_add()_ の引数にしてライブラリ関数を呼び出してます。
 
 182 行目では、ローカル変数 _ret_ をKonoha言語の _int_ 型として、VMに返すために _KReturn_ マクロを使用しています。
 _KReturn_ マクロは _include/konoha3/konoha.h_ で定義されており、主に次を使用します。
@@ -93,7 +101,7 @@ _KReturn_ マクロは _include/konoha3/konoha.h_ で定義されており、主
 * __KReturnFloatValue(c)__ : float型(受け取る側は _Type.Float_ パッケージが必要)
 
 
-## グルー関数におけるメンバ変数へのアクセス
+## グルー関数におけるクラス定義
 ### Konoha クラス構造体の定義
 C バインドにおける Konoha クラス構造の定義(以下の例は cevent クラスの構造)は次のように行ないます。
 
@@ -124,21 +132,27 @@ C における定義を Konoha クラスとして動作させるために、Kono
 519 行の _SETSTRUCTNAME マクロ_ で _cevent クラス_ と _cevent 構造体_ の関連付けを行ないます。
 
 520 行ではこのクラスの属性を指定しています。
-_KClassFlag_\*_ は _include/konoha3/konoha.h_ に定義されているので、そちらを参照してクラス属性を設定します。
+_KClassFlag \*_  は _include/konoha3/konoha.h_ に定義されているので、そちらを参照してクラス属性を設定します。
+521 - 523 行では、クラスとしての動作に必要となる
 
-524 行で _KLIB kNameSpace_DefineClass()_ を呼ぶことにより Konoha クラス名前空間への登録を行なっています。
+* Konoha オブジェクト初期化(defcevent.init)
+* Konoha オブジェクト参照トレース(defcevent.reftrace)
+* Konoha オブジェクト解放(defcevent.free)
+
+の処理を行なう関数を設定しています。
+
+524 行で、 _KLIB kNameSpace_DefineClass()_ を呼ぶことにより、_KDEFINE_CLASS defcevent_ の内容で Konoha クラス名前空間へ登録を行なっています。
 
 
-#### Init関数
+#### Konoha オブジェクト初期化関数
 521 行は、cevent クラスの初期化関数 _cevent_Init()_ を指定しています。
 
 クラス初期化関数は、次の場合に呼び出されます。
 
 * パッケージがロードされた際、各クラスの _NULL オブジェクト_ を生成する。
-* オブジェクトが _new_ される際、コンストラクタグルー関数を呼び出す前の初期化を行なう。
+* オブジェクトが _new_ されるにあたり、先立ってオブジェクト初期化を行なう。
 
 _cevent_Init()_ は 142 行から定義されていますが、第二引数の kObject ポインタを使用して、このオブジェクト(_this オブジェクト_)のメンバを初期化します。
-
 
     src/package-devel/Lib.Libevent_glue.c
     142  static void cevent_Init(KonohaContext *kctx, kObject *o, void *conf)
@@ -148,8 +162,7 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
     146  }
 
 また、_eventCBArg クラス_ のようにメンバに _Konoha オブジェクト_ を保持する場合は、オブジェクトの変更を GC に通知するために __KFieldInit マクロ__ を使用して初期化を行ないます。
-初期化以外の場合でオブジェクトを設定する際には __KFieldSet マクロ__ を使用します。
-
+初期化以外の場合でオブジェクトを変更する際には、 __KFieldSet マクロ__ を使用します。
 
     src/package-devel/Lib.Libevent_glue.c
     346  static void eventCBArg_Init(KonohaContext *kctx, kObject *o, void *conf)
@@ -161,8 +174,8 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
     352  }
 
 
-#### Reftrace 関数
-522 行は _cevent クラス_ では不要なためコメントアウトされていますが、GC による参照トレースに対する応答が必要なメンバ(_Konoha オブジェクト_)を持つ場合は必要となります。
+#### Konoha オブジェクト参照トレース関数
+522 行は _cevent クラス_ では不要なためコメントアウトされていますが、GC の参照トレースに対する応答が必要なメンバ(_Konoha オブジェクト_)を持つ場合は必要となります。
 
 例えば _eventCBArg クラス_ では次のように定義しています。
 
@@ -174,10 +187,10 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
     367          KRefTrace(cba->arg);
     368  }
 
-_KRefTrace マクロ_ は _NULL ポインタ_ を許容しない場合に使用します(Init関数における初期化の扱いによる)。
+_KRefTrace マクロ_ は、メンバオブジェクトが _NULL ポインタ_ を許容しない場合に使用します(Init関数における初期化の扱いによる)。
 _NULL ポインタ_ を許容している場合は、 _KRefTraceNullable マクロ_ を使用します。
 
-#### Free 関数
+#### Konoha オブジェクト解放関数
 523 行は _cevent クラス_ のオブジェクトが解放される時に呼ばれる _cevent_Free() 関数_ を指定しています。
 
 _cevent クラス_ ではオブジェクト解放にあたり libevent の _event_free()_ を実行する必要があるので、153 行で呼び出しています。
@@ -214,13 +227,13 @@ _cevent クラス_ ではオブジェクト解放にあたり libevent の _even
 
 このコンストラクタの目的は、event_new の結果を ev->event に保存することなので、それを 172 行で行なっています。
 
-そして、_thisオブジェクト_ を 173 行で戻り値として返します。
+そして、_this オブジェクト_ を 173 行で戻り値として返します。
 
 
 
 ## Konoha言語への登録
 先ほど示したグルー関数は C の世界で定義された関数です。
-Konoha 言語でメソッドとして利用可能にするためには Konoha に、グルー関数で利用する引数、戻り値の情報を登録する必要があります。
+Konoha 言語でメソッドとして利用可能にするためには、メソッドとしての引数、戻り値の情報を登録する必要があります。
 
 グルー関数の Konoha への登録は _Libevent_PackupNameSpace()_ 関数にて行われます。
 
@@ -309,7 +322,7 @@ C で定義されたグルークラスをスクリプト側で継承したい場
 
 
 # コールバックメソッドの引数について(Generics)
-libevent ではイベントの種類によりコールバック関数の引数が異なります。Konoha のコールバックメソッドもこれに対応する引数を定義する必要があります。
+libevent ではイベントの種類によりコールバック関数の引数が異なります。Konoha のコールバックメソッドもこれに対応するために、コールバックメソッドの引数を指定した _Func 型_ を定義する必要があります。
 
 グルー関数から Konoha のコールバックメソッドを呼び出すためには、コールバックメソッドの定義に _Func_ 型を使用し、その引数の型を _Generics_ で定義しなければなりません。
 
@@ -361,8 +374,8 @@ _KLIB KClass_Generics()_ の引数は _(コンテキスト, クラス, 戻り値
 libevent コールバックは C の関数を呼び出します。libevent コールバックとして Konoha メソッドを直接指定できません。
 そのため、
 
-1. libevent の _event_dispatch()_ から C のコールバック関数が呼び出す
-1. C コールバック関数から __ユーザー定義の Konoha メソッド__ を呼び出す
+1. libevent の _event_dispatch()_ 等から C のコールバック関数が呼び出される
+1. C コールバック関数から _ユーザー定義の Konoha メソッド_ を呼び出す
 
 という二段階の手続きが必要となります。
 
@@ -391,8 +404,9 @@ libevent のコールバック関数である _cevent_callback_1st()_ から Kon
     136  }
 
 126 行で _BEGIN_UnusedStack_ マクロにて、メソッド呼び出しのためのスタックの準備を行なっています。
-128 - 130 行でスタックに設定しています。128 行は通常の konoha メソッド呼び出しでは this オブジェクトが設定されますが、この場合は NULL オブジェクトにより簡易設定しています。
-コールバックメソッドが this オブジェクトを使わない場合であれば、この設定で問題ありません。
+
+128 - 130 行でスタックを設定しています。128 行は通常の konoha メソッド呼び出しでは this オブジェクトが設定されますが、この場合は NULL オブジェクトにより簡易設定しています。
+呼び出す Konoha メソッドが this オブジェクトを使わない場合であれば、この設定で問題ありません。
 
 そして 133 行の _KStackSetFuncAll_ マクロで呼び出しのためのスタック設定を完了し、134 行の _KStackCall_ マクロにて Konoha メソッドを呼び出します。
 
