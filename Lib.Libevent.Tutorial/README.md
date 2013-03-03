@@ -12,7 +12,8 @@ Lib.Libevent パッケージの作成にあたり、
 
 本チュートリアルに登場する例には行番号が振られていますが、github の konoha-project/konoha3 リポジトリ
 >   [commit 66103b28762cede82a9844a7963c7d2727578b66](https://github.com/konoha-project/konoha3/tree/66103b28762cede82a9844a7963c7d2727578b66 "ベースソース")
-  のソースを使用しています。実際のソースを参照しながらこのチュートリアルを読み進める際には、 commit ID に注意してください。
+
+のソースを使用しています。実際のソースを参照しながらこのチュートリアルを読み進める際には、 commit ID に注意してください。
 
 
 
@@ -33,7 +34,7 @@ Konoha 言語のプログラム記述には基本型として _boolean_ 型、 _
 
 また、 Kohoha オブジェクトの受け渡しも必要となります。
 
-Konoha メソッドからグルー関数が呼ばれた際には、C 言語の世界で Konoha メソッドの引数を取得しなければなりませんが、Konoha 言語の型と C 言語の型の橋渡しを行なうために、 _include/konoha3/konoha.h_ にて定義されているアクセス構造体 _struct KonohaValueVar_ を経由してアクセスします。
+Konoha メソッドとしてグルー関数が呼ばれた際には、C 言語の世界で Konoha メソッドの引数を取得しなければなりませんが、Konoha 言語の型と C 言語の型の橋渡しを行なうために、 _include/konoha3/konoha.h_ にて定義されているアクセス構造体 _struct KonohaValueVar_ を経由してアクセスします。
 
 166 - 170 行が実際の使用例となります。
 
@@ -55,7 +56,7 @@ _struct KonohaValueVar_ には様々な型、クラスに対応するための�
 
 
 ## グルー関数
-実行中の Konoha は
+ユーザースクリプトからグルー関数を経由して外部ライブラリを呼び出す場合、
 
 1. ユーザーが定義した Konoha スクリプトから Konoha メソッドとしてグルー関数を呼び出し
 1. グルー関数が対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出す
@@ -88,9 +89,9 @@ Konoha スタックは次の図のようになっています。
 
 ![Alt text](./konohaStackImage.png "Konoha Stack image")
 
-179, 180 行では Konoha VM が Konoha スタックに設定しているメソッドの引数(Konoha 言語の _Object_ 型) を参照するため C 言語の構造体ポインタ型に変換して保持します。
+179, 180 行では Konoha VM が Konoha スタックに設定しているメソッドの引数(Konoha 言語の _Object_ 型) を参照するため C 言語の構造体ポインタ型に変換して保持しています。
 
-181行目では、その Konoha オブジェクトのメンバを _event_add()_ の引数にしてライブラリ関数を呼び出してます。
+181行目では、その Konoha オブジェクトのメンバを _event_add()_ の引数にして __ライブラリ関数を呼び出してます__ 。
 
 182 行目では、ローカル変数 _ret_ をKonoha言語の _int_ 型として、VMに返すために _KReturn_ マクロを使用しています。
 _KReturn_ マクロは _include/konoha3/konoha.h_ で定義されており、主に次を使用します。
@@ -111,13 +112,13 @@ C バインドにおける Konoha クラス構造の定義(以下の例は ceven
     47          struct event *event;
     48  } kcevent;
 
-_kObjectHeader_ を構造の先頭に配置し、以降に必要な変数を配置していきます。
+_kObjectHeader h_ を構造の先頭に配置し、以降に必要な変数を配置していきます。
 
 _cevent クラス_ のメンバ変数 _event_ は Konoha 言語のオブジェクトから直接アクセスすることはできないため、必ずグルー関数を経由してのアクセスとなります。
 
 
 ### Konoha の名前空間への登録
-C における定義を Konoha クラスとして動作させるために、Konoha の名前空間への登録を行ないます。
+C における定義を Konoha クラスとして動作させるために、Konoha の名前空間への登録を行なう必要があります。
 
     src/package-devel/Lib.Libevent_glue.c
     517          // cevent
@@ -133,15 +134,14 @@ C における定義を Konoha クラスとして動作させるために、Kono
 
 520 行ではこのクラスの属性を指定しています。
 _KClassFlag \*_  は _include/konoha3/konoha.h_ に定義されているので、そちらを参照してクラス属性を設定します。
-521 - 523 行では、クラスとしての動作に必要となる
+521 - 523 行では、クラスとしての動作に必要となる以下のの処理を行なう関数を設定しています。
 
 * Konoha オブジェクト初期化(defcevent.init)
 * Konoha オブジェクト参照トレース(defcevent.reftrace)
 * Konoha オブジェクト解放(defcevent.free)
 
-の処理を行なう関数を設定しています。
 
-524 行で、 _KLIB kNameSpace_DefineClass()_ を呼ぶことにより、_KDEFINE_CLASS defcevent_ の内容で Konoha クラス名前空間へ登録を行なっています。
+524 行で、 _KLIB kNameSpace_DefineClass()_ を呼ぶことにより、 _KDEFINE_CLASS defcevent_ の内容で Konoha クラス名前空間へ登録を行なっています。
 
 
 #### Konoha オブジェクト初期化関数
@@ -152,7 +152,7 @@ _KClassFlag \*_  は _include/konoha3/konoha.h_ に定義されているので�
 * パッケージがロードされた際、各クラスの _NULL オブジェクト_ を生成する。
 * オブジェクトが _new_ されるにあたり、先立ってオブジェクト初期化を行なう。
 
-_cevent_Init()_ は 142 行から定義されていますが、第二引数の kObject ポインタを使用して、このオブジェクト(_this オブジェクト_)のメンバを初期化します。
+_cevent_Init()_ は 142 行から定義されていますが、第二引数の kObject ポインタを使用して、このオブジェクト( _this オブジェクト_ )のメンバを初期化します。
 
     src/package-devel/Lib.Libevent_glue.c
     142  static void cevent_Init(KonohaContext *kctx, kObject *o, void *conf)
@@ -161,7 +161,7 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
     145          ev->event = NULL;
     146  }
 
-また、_eventCBArg クラス_ のようにメンバに _Konoha オブジェクト_ を保持する場合は、オブジェクトの変更を GC に通知するために __KFieldInit マクロ__ を使用して初期化を行ないます。
+また、 _eventCBArg クラス_ のようにメンバに _Konoha オブジェクト_ を保持する場合は、オブジェクトの変更を GC に通知するために __KFieldInit マクロ__ を使用して初期化を行ないます。
 初期化以外の場合でオブジェクトを変更する際には、 __KFieldSet マクロ__ を使用します。
 
     src/package-devel/Lib.Libevent_glue.c
@@ -175,7 +175,7 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
 
 
 #### Konoha オブジェクト参照トレース関数
-522 行は _cevent クラス_ では不要なためコメントアウトされていますが、GC の参照トレースに対する応答が必要なメンバ(_Konoha オブジェクト_)を持つ場合は必要となります。
+522 行は _cevent クラス_ では不要なためコメントアウトされていますが、GC の参照トレースに対する応答が必要なメンバ( _Konoha オブジェクト_ )を持つ場合は必要となります。
 
 例えば _eventCBArg クラス_ では次のように定義しています。
 
@@ -187,7 +187,7 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
     367          KRefTrace(cba->arg);
     368  }
 
-_KRefTrace マクロ_ は、メンバオブジェクトが _NULL ポインタ_ を許容しない場合に使用します(Init関数における初期化の扱いによる)。
+_KRefTrace マクロ_ は、メンバオブジェクトが _NULL ポインタ_ を許容しない場合に使用します(Init関数における初期化で _NULLオブジェクト_ を設定している場合)。
 _NULL ポインタ_ を許容している場合は、 _KRefTraceNullable マクロ_ を使用します。
 
 #### Konoha オブジェクト解放関数
@@ -223,21 +223,21 @@ _cevent クラス_ ではオブジェクト解放にあたり libevent の _even
     173          KReturn(ev);
     174  }
 
-166 行で _this オブジェクト_ の参照を、_オブジェクト構造体ポインタ ev_ に取得しています。
+166 行で _this オブジェクト_ の参照を、 _オブジェクト構造体ポインタ ev_ に取得しています。
 
 このコンストラクタの目的は、event_new の結果を ev->event に保存することなので、それを 172 行で行なっています。
 
-そして、_this オブジェクト_ を 173 行で戻り値として返します。
+そして、 _this オブジェクト_ を 173 行で戻り値として返します。
 
 
 
-## Konoha言語への登録
+### Konoha言語へのメソッドとしての登録
 先ほど示したグルー関数は C の世界で定義された関数です。
-Konoha 言語でメソッドとして利用可能にするためには、メソッドとしての引数、戻り値の情報を登録する必要があります。
+Konoha 言語でメソッドとして利用可能にするためには、メソッドとしての引数、戻り値の情報とグルー関数の対応を登録する必要があります。
 
 グルー関数の Konoha への登録は _Libevent_PackupNameSpace()_ 関数にて行われます。
 
-※ _Libevent_PackupNameSpace()_ の詳細は後述する「Konoha スクリプトからパッケージをロードする際の内部動作」にて説明します。
+※ _Libevent_PackupNameSpace()_ の詳細は後述する [Konoha スクリプトからパッケージをロードする際の内部動作](#konoha--6)にて説明します。
 
     src/package-devel/Lib.Libevent_glue.c
     505  static kbool_t Libevent_PackupNameSpace(KonohaContext *kctx, kNameSpace *ns, int option, KTraceInfo *trace)
@@ -354,7 +354,7 @@ libevent ではイベントの種類によりコールバック関数の引数�
 先頭から、
 _{第一引数, 第二引数, ...}_
 となります。
-1. 580 行で _KLIB KClass_Generics()_ を呼ぶことにより、_Func_ の _Generics_ 型を Konoha のクラスとして登録しています。
+1. 580 行で _KLIB KClass_Generics()_ を呼ぶことにより、 _Func_ の _Generics_ 型を Konoha のクラスとして登録しています。
 _KLIB KClass_Generics()_ の引数は _(コンテキスト, クラス, 戻り値の型, 引数の数, 引数の定義テーブル)_ となります。
 1. 581 行では、[Konoha言語への登録] で説明した _MethodData[]_ へ登録するための型情報を取得し、615 行でそれを使用しています。
 
