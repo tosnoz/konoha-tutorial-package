@@ -8,7 +8,7 @@ Lib.Libevent パッケージの作成にあたり、
 * 移植性を保持するため、元の API に近いものとする
 
 という方針で作成しています。
-オブジェクト指向の形態に変更していますが、それ以外の引数は同じ形になるように作成しています。
+Konoha はオブジェクト指向言語であるためオブジェクト指向の形態に変更していますが、それ以外の引数は同じ形になるように作成しています(詳細は[Lib.Libevent パッケージでのオブジェクト指向の形態への変更について] をご覧ください)。
 
 本チュートリアルに登場する例には行番号が振られていますが、github の konoha-project/konoha3 リポジトリ
 >   [commit 66103b28762cede82a9844a7963c7d2727578b66](https://github.com/konoha-project/konoha3/tree/66103b28762cede82a9844a7963c7d2727578b66 "ベースソース")
@@ -526,3 +526,37 @@ Konoha は ビルドシステムとして cmake を使用しています。
 cmake/FindLibEvent.cmake についての詳細は cmake ドキュメントを参照してください。
 
 6 - 7 行で C のソースファイルと、グルースクリプトファイルを指定し、8 行で Konoha package として追加します。
+
+
+# Lib.Libevent パッケージでのオブジェクト指向の形態への変更について
+[はじめに](https://github.com/tosnoz/konoha-tutorial-package/tree/tosnoz_edit/Lib.Libevent.Tutorial#)
+で少し触れた Konoha パッケージでのオブジェクト指向の形態への変更について簡単に説明します。
+
+libevent の内部では、管理用構造体が数種類定義されており、オブジェクト(領域)を確保して使用しています。
+
+_struct event_base_ 構造体を例にすると
+
+    1 struct event_base *base = event_base_new();
+    2
+    3 ... something event setting ...
+    4
+    5 event_base_dispatch(base);
+
+というようになります。
+
+1行で _struct event_base_ オブジェクトを作成し、5行でそのオブジェクトを指定して  _event_base_dispatch()_ 関数を呼んでいます。
+
+libevent では、管理オブジェクトを指定する場合、関数は第一引数に管理オブジェクトを取るよう設計されています。
+C 言語で作成されていますが、基本構造としてはオブジェクト指向となっています。
+
+一方、 Konoha はオブジェクト指向言語であり、同等な処理を記述する場合は次のようなスクリプトが自然です。
+
+    1 event_base base = new event_base();
+    2
+    3 ... something event setting ...
+    4
+    5 base.event_dispatch();
+
+1行で _new event_base()_ でオブジェクトを生成し、5行でそのオブジェクトに対して _event_dispatch()_ メソッドを呼んでいます。
+
+Lib.Libevent パッケージでは、他のオブジェクトについても同様の考え方でオブジェクト指向で記述できるように実装しています。
