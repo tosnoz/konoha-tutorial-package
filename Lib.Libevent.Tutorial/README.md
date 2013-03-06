@@ -25,7 +25,9 @@ Konoha はオブジェクト指向言語であるためオブジェクト指向�
 
 
 
-# メソッドを定義する
+# クラスを定義する
+Konoha はオブジェクト指向言語であるため、_libevent_ ライブラリ関数のバインドは _Lib.Libevent_ パッケージ内でクラスを定義し、各クラスにデータ構造(オブジェクト)とグルー関数を配置します。
+
 ## Konoha 言語の型と C 言語の型
 C/C++ で Konoha 言語のメソッドを記述する場合、最も気を付けなければならない点は Konoha 言語と C 言語の間でのデータの受け渡しです。
 
@@ -102,7 +104,7 @@ _KReturn_ マクロは _include/konoha3/konoha.h_ で定義されており、主
 * __KReturnFloatValue(c)__ : float型(受け取る側は _Type.Float_ パッケージが必要)
 
 
-## グルー関数におけるクラス定義
+## 外部ライブラリのデータ構造をクラスへの割付ける
 ### Konoha クラス構造体の定義
 C バインドにおける Konoha クラス構造の定義(以下の例は cevent クラスの構造)は次のように行ないます。
 
@@ -112,7 +114,7 @@ C バインドにおける Konoha クラス構造の定義(以下の例は ceven
     47          struct event *event;
     48  } kcevent;
 
-_kObjectHeader h_ を構造の先頭に配置し、以降に必要な変数を配置していきます。
+_kObjectHeader h_ を構造体の先頭に配置し、以降に必要な変数を配置していきます。
 
 _cevent クラス_ のメンバ変数 _event_ は Konoha 言語のオブジェクトから直接アクセスすることはできないため、必ずグルー関数を経由してのアクセスとなります。
 
@@ -536,11 +538,11 @@ libevent の内部では、管理用構造体が数種類定義されており�
 
 _struct event_base_ 構造体を例にすると
 
-    1 struct event_base *base = event_base_new();
+    1     struct event_base *base = event_base_new();
     2
-    3 ... something event setting ...
+    3     ... something event setting ...
     4
-    5 event_base_dispatch(base);
+    5     event_base_dispatch(base);
 
 というようになります。
 
@@ -549,13 +551,13 @@ _struct event_base_ 構造体を例にすると
 libevent では、管理オブジェクトを指定する場合、関数は第一引数に管理オブジェクトを取るよう設計されています。
 C 言語で作成されていますが、基本構造としてはオブジェクト指向となっています。
 
-一方、 Konoha はオブジェクト指向言語であり、同等な処理を記述する場合は次のようなスクリプトが自然です。
+一方、 Konoha はオブジェクト指向言語であり、同等な処理を記述する場合は次のような記述が自然です。
 
-    1 event_base base = new event_base();
+    1     event_base base = new event_base();
     2
-    3 ... something event setting ...
+    3     ... something event setting ...
     4
-    5 base.event_dispatch();
+    5     base.event_dispatch();
 
 1行で _new event_base()_ でオブジェクトを生成し、5行でそのオブジェクトに対して _event_dispatch()_ メソッドを呼んでいます。
 
