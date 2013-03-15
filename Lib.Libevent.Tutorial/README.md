@@ -5,21 +5,24 @@ Konoha言語はスクリプト言語です。
 スクリプト言語はグルー言語とも呼ばれ、様々な機能を組み合わせてプログラムを簡単に作成できることを、糊(グルー)で機能を貼り合わせることに比喩されて、そう呼ばれています。
 他の言語と同様に、Konha言語からはC/C++などで開発されたライブラリを利用することができます。
 C/C++ライブラリは、その長い開発期間や多くの利用を経て、安定かつ高速に動作するものが多く、現在でも積極的に利用されています。
+
 本ドキュメント、Konohaパッケージ開発ガイドは、Konoha言語からこれらC/C++ライブラリを利用したい開発者に向けて、その具体的な方法を解説するものです。
 
 Konohaでは、C/C++ライブラリを利用する為の簡単なグルー関数(バインド、ラッパーとも呼びます）を作成する必要があります。
 この作業をバインディングと呼びます。
-また、複数のバインドをまとめたものをパッケージと呼び、利用者はパッケージ単位でC/C++ライブラリを利用することができます。 
+そして、複数のバインドをまとめたものをパッケージと呼び、利用者はパッケージ単位でC/C++ライブラリを利用することができます。 
 
 
 本ドキュメントでは、複雑なバインディングの説明を簡単に行う為に、具体的なC/C++ライブラリのパッケージを紹介しながらKonohaでのパッケージ作成方法について説明を行っていきます。
 本ドキュメントの構成は以下の通りです。 
 
-TODO
-2章はバインディングに関する最も基礎的な知識を説明します。
-3章では Lib.Libevent パッケージを題材に、基本的なパッケージの構築方法について学習します。
+[グルー関数の作成](#-3)では Lib.Libevent パッケージを題材に、基本的なパッケージの構築方法について学習します。
 パッケージ作成の流れや、Konohaからの利用方法などについて述べています。
-4章では、総括として、今後のパッケージ開発に参考になるような情報をまとめました。 
+
+[Konoha スクリプトからパッケージをロードする際の内部動作](#konoha--6)では、パッケージがロードされる際の動作について、パッケージ作成に必要な情報をまとめました。
+
+[Lib.Libevent パッケージでのオブジェクト指向の形態への変更について](#liblibevent-)では、Lib.Libevent パッケージでの実装の考え方について補足的に説明しました。
+
 
 なお、本ドキュメントは以下のような方を対象にしています。
 
@@ -32,19 +35,39 @@ TODO
 
 
 ## 用語の説明
-1. __バインディング__ :	外部 C/C++ ライブラリを Konoha 言語から利用できるように Konoha パッケージを構築する作業
-1. __ライブラリ関数__：	外部 C/C++ ライブラリの関数
-1. __グルー関数__：	Konoha 言語用グルー関数。Lib.Libevent パッケージでは Libevent_glue.c 内で定義されている。
-C 言語の関数であるが、Konoha 言語からはメソッドとして呼ばれる。
-他の文書では「バインド」、「ラッパー」と呼ばれることもある。
-1. __Konoha メソッド__：	Konoha 言語のメソッド
-1. __Konoha オブジェクト__：	Konoha 言語のオブジェクト
+<table border=1 align=center class="inline">
+	<tr class="row0" align=center>
+		<th class="col0"> 用語 </th>
+		<th class="col1"> 説明 </th>
+	</tr>
+	<tr>
+		<td class="col0"> バインディング </td>
+		<td class="col1"> 外部 C/C++ ライブラリを Konoha 言語から利用できるように Konoha パッケージを構築すること </td>
+	</tr>
+	<tr>
+		<td class="col0"> ライブラリ関数 </td>
+		<td class="col1"> 外部 C/C++ ライブラリの関数 </td>
+	</tr>
+	<tr>
+		<td class="col0"> グルー関数 </td>
+		<td class="col1"> Konoha 言語用グルー関数。Lib.Libevent パッケージでは Libevent_glue.c 内で定義されている。 C 言語の関数であるが、Konoha 言語からはメソッドとして呼ばれる。 「バインド」、「ラッパー」と呼ばれることもある。</td>
+	</tr>
+	<tr>
+		<td class="col0"> Konoha メソッド </td>
+		<td class="col1"> Konoha 言語のメソッド </td>
+	</tr>
+	<tr>
+		<td class="col0"> Konoha オブジェクト </td>
+		<td class="col1"> Konoha 言語のオブジェクト </td>
+	</tr>
+</table>
 
 
 ## 開発環境
 具体的なバインディングの説明に入る前に、本ドキュメントでの開発環境について触れておきます。
-まず、本ドキュメントでは「Konoha」と書いた場合、特に明記した場合をのぞいて、Konoha 3.0(2013.03現在の最新版)を意味します。
+まず、本ドキュメントでは"Konoha"と書いた場合、特に明記した場合をのぞいて、Konoha 3.0(2013.03現在の最新版)を意味します。
 Konoha言語はバージョンごとにバインディングの方法が大きく異なりますので、ドキュメントを読み進める前にお使いのKonoha言語のバージョンを確認してください。
+
 バージョンは、Konohaを起動すると確認できます。
 起動画面の先頭にきているのが、Konohaのバージョンです。 下の例では "Konoha 3.0" がバージョン、"Rome" が開発コードになっています。
 
@@ -61,20 +84,29 @@ Konohaはマルチプラットフォームで動作しますので、バイン�
 そしてそれぞれのプラットフォームで用いるCコンパイラは異なります。
 本ドキュメントはGNU/Linux, GCCでのバインディングを前提に解説しますが、この方法は以下のプラットフォームでもほぼ同じように動作します。 
 
-<div class="table sectionedit6"><table border=1 align=center class="inline">
+<table border=1 align=center class="inline">
+	<caption> プラットフォームと対応する開発環境 </caption>
 	<tr class="row0">
-		<th class="col0"><acronym title="Operating System">OS</acronym> </th><th class="col1"> Compiler </th><th class="col2"> version</th>
+		<th class="col0"><acronym title="Operating System">OS</acronym> </th>
+		<th class="col1"> Compiler </th>
+		<th class="col2"> version </th>
 	</tr>
 	<tr class="row1" align=center>
-		<td class="col0">Windows </td><td class="col1"> mingw </td><td class="col2"> 4.x  </td>
+		<td class="col0"> Windows </td>
+		<td class="col1"> mingw </td>
+		<td class="col2"> 4.x  </td>
 	</tr>
-	<tr class="row2">
-		<td class="col0">MacOSX </td><td class="col1"> gcc   </td><td class="col2"> 4.x </td>
+	<tr class="row2" align=center>
+		<td class="col0"> MacOSX </td>
+		<td class="col1"> gcc </td>
+		<td class="col2"> 4.x </td>
 	</tr>
-	<tr class="row3">
-		<td class="col0">Linux </td><td class="col1"> gcc </td><td class="col2"> 4.x </td>
+	<tr class="row3" align=center>
+		<td class="col0"> Linux </td>
+		<td class="col1"> gcc </td>
+		<td class="col2"> 4.x </td>
 	</tr>
-</table></div>
+</table>
 
 
 
@@ -82,7 +114,7 @@ Konohaはマルチプラットフォームで動作しますので、バイン�
 -----
 
 # グルー関数の作成
-このグルー関数の作成では、Konoha 言語から [libevent](http://libevent.org/) を外部 C/C++ ライブラリとしてバインドしている Lib.Libevent パッケージを例として Konoha 言語にバインドする方法を実装例として示しながら説明していきます。
+ここでは Konoha 言語から [libevent](http://libevent.org/) を外部 C/C++ ライブラリとしてバインドしている Lib.Libevent パッケージを例として Konoha 言語にバインドする方法を実装例として示しながら説明していきます。
 
 Lib.Libevent パッケージの作成にあたり、
 
@@ -98,15 +130,37 @@ Konoha はオブジェクト指向言語であるためオブジェクト指向�
 
 ## パッケージの構成ファイル
 パッケージは、以下のファイルで構成されます。
+<table border=1 align=center class="inline">
+	<tr class="row0">
+		<th class="col0"> ファイル名 </th>
+		<th class="col1"> 説明 </th>
+	</tr>
+	<tr>
+		<td class="col0"> パッケージ名_glue.c </td>
+		<td class="col1"> cソースファイル、主にグルー関数が記述される。ファイル名は任意 </td>
+	</tr>
+	<tr>
+		<td class="col0"> パッケージ名_glue.k </td>
+		<td class="col1"> パッケージインターフェイススクリプト </td>
+	</tr>
+	<tr>
+		<td class="col0"> パッケージ名_kick.k </td>
+		<td class="col1"> パッケージスクリプト<br>Lib.Libevent パッケージでは、Konoha 用ラッパークラスを定義しています。 </td>
+	</tr>
+	<tr>
+		<td class="col0"> CMakeLists.txt </td>
+		<td class="col1"> CMake 定義ファイル<br>詳細は CMake ドキュメントをご覧ください。 </td>
+	</tr>
+	<tr>
+		<td class="col0"> パッケージ名_glue.so </td>
+		<td class="col1"> パッケージ名_glue.c をコンパイルすることにより生成される共有ライブラリ </td>
+	</tr>
+</table>
 
-* パッケージ名_glue.c :	cソースファイル、主にグルー関数が記述される。ファイル名は任意
-* パッケージ名_glue.k :	パッケージインターフェイススクリプト
-* パッケージ名_kick.k :	パッケージスクリプト。Lib.Libevent パッケージでは、Konoha 用ラッパークラスを定義しています。
-* CMakeLists.txt :		cmake 定義ファイル
-* パッケージ名_glue.so :	パッケージ名_glue.c をコンパイルすることにより生成される共有ライブラリ
+(注) _Lib.Libevent_ パッケージの場合、 _「パッケージ名」_ は _"Libevent"_ となります。
 
-_Lib.Libevent_ パッケージの場合、「パッケージ名」は "Libevent" となります。
-このうち、Konoha からグルー関数を呼び出すために必要となるものは、共有ライブラリの パッケージ名_glue.so のみです。パッケージ名_glue.k および パッケージ名_kick.k は存在する場合読み込まれますが、定義が必要なければ存在しなくても動作に影響はありません。
+
+このうち、Konoha からグルー関数を呼び出すために必要となるものは、共有ライブラリの パッケージ名_glue.so のみです。パッケージ名_glue.k および パッケージ名_kick.k は存在する場合読み込まれますが、定義などが不要であれば存在しなくても動作に影響はありません。
 
 
 ## クラスを定義する
@@ -120,9 +174,9 @@ Konoha 言語のプログラム記述には基本型として _boolean_ 型、 _
 
 また、 Kohoha オブジェクトの受け渡しも必要となります。
 
-Konoha メソッドとしてグルー関数が呼ばれた際には、C 言語の世界で Konoha メソッドの引数を取得しなければなりませんが、Konoha 言語の型と C 言語の型の橋渡しを行なうために、 _include/konoha3/konoha.h_ にて定義されているアクセス構造体 _struct KonohaValueVar_ を経由してアクセスします。
+Konoha メソッドとしてグルー関数が呼ばれた際には、C 言語の世界で Konoha メソッドの引数を取得しなければなりませんが、Konoha 言語の型と C 言語の型の橋渡しを行なうために、 _include/konoha3/konoha.h_ にて定義されているアクセス構造体 _struct KonohaValueVar_ のメンバー変数を経由してアクセスします。
 
-166 - 170 行が実際の使用例となります。
+166 - 170 行の "_sfp[0].asObject_" や "_sfp[2].intValue_" が実際のアクセス例となります。
 
     src/package-devel/Lib.Libevent_glue.c
     164  static KMETHOD cevent_new(KonohaContext *kctx, KonohaStack *sfp)
@@ -145,8 +199,8 @@ _struct KonohaValueVar_ には様々な型、クラスに対応するための�
 ユーザースクリプトからグルー関数を経由して外部ライブラリを呼び出す場合、
 
 1. ユーザーが作成した Konoha スクリプトから Konoha メソッドとして呼ぶ。
-1. KonohaVM は登録されているクラス、メソッド名からグルー関数を呼び出す。
-1. グルー関数は対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出す。
+1. KonohaVM は登録されているクラス、メソッド名から対応するグルー関数を呼び出す。
+1. 呼び出されたグルー関数は対応する C/C++ ライブラリ関数(本チュートリアルでは libevent のライブラリ関数)を呼び出す。
 
 という流れになります。
 
@@ -155,7 +209,7 @@ _struct KonohaValueVar_ には様々な型、クラスに対応するための�
 
 1. Konoha スタックからメソッドとして受け取った引数の取得
 1. C/C++ 外部ライブラリ関数を呼び出し
-1. 戻り値を C 言語の型から Konoha 言語のデータ型 へ変換しリターンする
+1. 戻り値を C 言語の型から Konoha 言語のデータ型 へ変換し return する
 
 それでは libevent ライブラリで定義されている _event_add()_ 関数を _cevent クラス_ の _event_add() メソッド_ としてバインドする例を示します。
 _event_add()_ ライブラリ関数を呼び出すためのグルー関数 _cevent_event_add()_ の定義は以下のようになります。
@@ -184,13 +238,32 @@ Konoha スタックは次の図のようになっています。
 182 行目では、ローカル変数 _ret_ をKonoha言語の _int_ 型として、VMに返すために _KReturn_ マクロを使用しています。
 _KReturn_ マクロは _include/konoha3/konoha.h_ で定義されており、主に次を使用します。
 
-* __KReturn(o)__ :	 オブジェクト
-* __KReturnUnboxValue(d)__ : 基本型
-* __KReturnVoid()__ : void
-* __KReturnFloatValue(c)__ : float型(受け取る側は _Type.Float_ パッケージが必要)
+<table border=1 align=center class="inline">
+	<tr>
+		<th class="col0"> マクロ </th>
+		<th class="col1"> Konoha メソッドとしての戻り値の型 </th>
+	</tr>
+	<tr>
+		<td class="col0"> KReturn(o) </td>
+		<td class="col1"> オブジェクト </td>
+	</tr>
+	<tr>
+		<td class="col0"> KReturnUnboxValue(d) </td>
+		<td class="col1"> 基本型 </td>
+	</tr>
+	<tr>
+		<td class="col0"> KReturnVoid() </td>
+		<td class="col1"> void </td>
+	</tr>
+	<tr>
+		<td class="col0"> KReturnFloatValue(c) </td>
+		<td class="col1"> float型(受け取る側は Type.Float パッケージが必要) </td>
+	</tr>
+</table>
 
 
-### 外部ライブラリのデータ構造をクラスへの割付ける
+
+### 外部ライブラリのデータ構造をグルークラスへ割付ける
 #### Konoha クラス構造体の定義
 C バインドにおける Konoha クラス構造の定義(以下の例は cevent クラスの構造)は次のように行ないます。
 
@@ -200,7 +273,7 @@ C バインドにおける Konoha クラス構造の定義(以下の例は ceven
     47          struct event *event;
     48  } kcevent;
 
-_kObjectHeader h_ を構造体の先頭に配置し、以降に必要な変数を配置していきます。
+_kObjectHeader h_ を構造体の先頭に配置し、以降に必要なメンバ変数を配置していきます。
 
 _cevent クラス_ のメンバ変数 _event_ は Konoha 言語のオブジェクトから直接アクセスすることはできないため、必ずグルー関数を経由してのアクセスとなります。
 
@@ -224,9 +297,9 @@ C における定義を Konoha クラスとして動作させるために、Kono
 _KClassFlag \*_  は _include/konoha3/konoha.h_ に定義されているので、そちらを参照してクラス属性を設定します。
 521 - 523 行では、クラスとしての動作に必要となる以下の処理を行なう関数を設定しています。
 
-* Konoha オブジェクト初期化(defcevent.init)
-* Konoha オブジェクト参照トレース(defcevent.reftrace)
-* Konoha オブジェクト解放(defcevent.free)
+* Konoha オブジェクト初期化関数(_defcevent.init_)
+* Konoha オブジェクト参照トレース関数(_defcevent.reftrace_)
+* Konoha オブジェクト解放関数(_defcevent.free_)
 
 
 524 行で、 _KLIB kNameSpace_DefineClass()_ を呼ぶことにより、 _KDEFINE_CLASS defcevent_ の内容で Konoha クラス名前空間へ登録を行なっています。
@@ -238,7 +311,7 @@ _KClassFlag \*_  は _include/konoha3/konoha.h_ に定義されているので�
 クラス初期化関数は、次の場合に呼び出されます。
 
 * パッケージがロードされた際、各クラスの _NULL オブジェクト_ を生成する。
-* オブジェクトが _new_ されるにあたり、先立ってオブジェクト初期化を行なう。
+* コンストラクタ(_new_)が実行されるにあたり、先立ってオブジェクト初期化を行なう。
 
 _cevent_Init()_ は 142 行から定義されていますが、第二引数の kObject ポインタを使用して、このオブジェクト( _this オブジェクト_ )のメンバを初期化します。
 
@@ -250,7 +323,7 @@ _cevent_Init()_ は 142 行から定義されていますが、第二引数の k
     146  }
 
 また、 _eventCBArg クラス_ のようにメンバに _Konoha オブジェクト_ を保持する場合は、オブジェクトの変更を GC に通知するために __KFieldInit マクロ__ を使用して初期化を行ないます。
-初期化以外の場合でオブジェクトを変更する際には、 __KFieldSet マクロ__ を使用します。
+初期化以外の場合、オブジェクトへの参照を変更する際には __KFieldSet マクロ__ を使用します。
 
     src/package-devel/Lib.Libevent_glue.c
     346  static void eventCBArg_Init(KonohaContext *kctx, kObject *o, void *conf)
@@ -359,9 +432,11 @@ Konoha 言語でメソッドとして利用可能にするためには、メソ�
 
 Konohaメソッドを登録するデータ構造 _KDEFINE_METHOD_ _MethodData[]_ は以下のフォーマットとなります。
 
-* アノテーション , グルー関数のアドレス , 戻り値の型 , Thisの型 , メソッド名 , メソッドの引数の数, 第1引数の型, 第1引数の型, 第2引数の型, 第2引数の型...
+* アノテーション , グルー関数のアドレス , 戻り値の型 , Thisの型 , メソッド名 , メソッドの引数の数, 第1引数の型, 第1引数の型, 第2引数の型, 第2引数の型, ...
 
-600 行で _cevent コンストラクタ_ を、601行で _event_add() メソッド_ をそれぞれ次の宣言に対応するように定義しています。
+_KLIB kNameSpace_LoadMethodData()_ では、 _MethodData[]_ 中の "メソッドの引数の数" に従って、次のグルー関数の "アノテーション" から始まる定義を識別するので、 "メソッドの引数の数" を間違えた場合正しく読み取れず、大抵の場合はパッケージをロードした段階で "Segmentation Fault" となります。
+
+600 行で _cevent コンストラクタ_ を、601行で _event_add() メソッド_ をそれぞれ次の Konoha での宣言に対応するように定義しています。
 
     @Public cevent cevent(cevent_base, int, int, eventCBArg);
     @Public cevent event_add(ctimeval);
@@ -374,21 +449,74 @@ _KDEFINE_METHOD MethodData[]_ の最後の要素には、626 行のように終�
 
 メソッドに付与可能なアノテーションは以下のとおりです。
 
-     Public   ... @Public    ：クラス外部からのアクセスを許可する
-    _Private  ... @Private   ：クラス外部からのアクセスを禁止する
-    _Final    ... @Final     ：オーバーライド禁止
-    _Const    ... @Const     ：引数が同じ場合，同じ物を返す
-    _Static   ... @Static    ：インスタンス化せずにメソッドを呼び出すことを許可する
-    _Im       ... @Immutable ：thisが変化しない
-    _Coercion ... @Coercion  ：引数が自動的にキャストされる
-    _Hidden   ... @Hidden
-    _Virtual  ... @Virtual
-    _Ignored  ... @IgnoredOverride
+<table border=1 align=center class="inline">
+	<tr>
+		<th class="col0"> フラグ名 </th>
+		<th class="col1"> Konoha アノテーション </th>
+		<th class="col2"> 説明 </th>
+	</tr>
+	<tr>
+		<td class="col0"> _Public </td>
+		<td class="col1"> @Public </td>
+		<td class="col2"> クラス外部からのアクセスを許可する </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Private </td>
+		<td class="col1"> @Private </td>
+		<td class="col2"> クラス外部からのアクセスを禁止する </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Final </td>
+		<td class="col1"> @Final </td>
+		<td class="col2"> オーバーライド禁止 </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Const </td>
+		<td class="col1"> @Const </td>
+		<td class="col2"> 引数が同じ場合，同じ物を返す </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Static </td>
+		<td class="col1"> @Static </td>
+		<td class="col2"> インスタンス化せずにメソッドを呼び出すことを許可する </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Im </td>
+		<td class="col1"> @Immutable </td>
+		<td class="col2"> thisが変化しない </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Coercion </td>
+		<td class="col1"> @Coercion </td>
+		<td class="col2"> 引数が自動的にキャストされる </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Hidden </td>
+		<td class="col1"> @Hidden </td>
+		<td class="col2"> 予約 </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Virtual </td>
+		<td class="col1"> @Virtual </td>
+		<td class="col2"> 予約 </td>
+	</tr>
+	<tr>
+		<td class="col0"> _Ignored </td>
+		<td class="col1"> @IgnoredOverride </td>
+		<td class="col2"> 予約 </td>
+	</tr>
+</table>
 
 
 ### グルークラスの制約
-#### グルークラスは Final なクラスとして定義しなければない
-C で定義されたグルークラスをスクリプト側で継承したい場合には Libevent_kick.k における _event_base クラス_ 定義のようにラップするオブジェクトを作成することで回避する方法をとります。
+グルークラスは
+
+*  Final クラスとして定義しなければない
+
+という制約があります。
+
+この制約のため C で定義されたグルークラスを Konoha 言語のクラス定義に _extends_ を使用して直接的に継承することはできません。
+継承したい場合には Libevent_kick.k における _event_base クラス_ 定義のようにラップするクラスを定義して、ユーザープログラムからはそれを継承します。
 
     src/package-devel/Lib.Libevent_kick.k
     32  class event_base {
@@ -409,10 +537,11 @@ C で定義されたグルークラスをスクリプト側で継承したい場
     52  }
 
 
-## コールバックメソッドの引数について(Generics)
-libevent ではイベントの種類によりコールバック関数の引数が異なります。Konoha のコールバックメソッドもこれに対応するために、コールバックメソッドの引数を指定した _Func 型_ を定義する必要があります。
+## コールバックメソッドの呼び出し
+### コールバックメソッドの引数について(Generics)
+libevent ではイベントの種類によりコールバック関数の引数が異なります。Konoha のコールバックメソッドもこれに対応するために、コールバックメソッドに引数を指定した _Func 型_ を定義します。
 
-グルー関数から Konoha のコールバックメソッドを呼び出すためには、コールバックメソッドの定義に _Func_ 型を使用し、その引数の型を _Generics_ で定義しなければなりません。
+具体的には、コールバックメソッドの定義に _Func_ 型を使用し、その引数の型を _Generics_ で定義します。
 
     src/package-devel/Lib.Libevent_glue.c
     578          //eventCB_p
@@ -458,7 +587,7 @@ _KLIB KClass_Generics()_ の引数は _(コンテキスト, クラス, 戻り値
 
 
 
-## libevent コールバックから Konoha コールバックメソッドの呼び出し
+### libevent コールバックから Konoha コールバックメソッドの呼び出し
 libevent コールバックは C の関数を呼び出します。libevent コールバックとして Konoha メソッドを直接指定できません。
 そのため、
 
@@ -469,8 +598,8 @@ libevent コールバックは C の関数を呼び出します。libevent コ�
 
 
 
-### グルー関数から Konoha メソッドの呼び出し手順
-グルー関数から Konoha メソッドを呼び出すためには、Konoha スタックを設定する必要があります。
+#### グルー関数から Konoha メソッドの呼び出し手順
+グルー関数から Konoha メソッドを呼び出すためには、準備として Konoha スタックを設定する必要があります。
 libevent のコールバック関数である _cevent_callback_1st()_ から Konoha コールバックメソッドを呼び出す手順を例に説明していきます。
 
     src/package-devel/Lib.Libevent_glue.c
@@ -494,14 +623,14 @@ libevent のコールバック関数である _cevent_callback_1st()_ から Kon
 126 行で _BEGIN_UnusedStack_ マクロにて、メソッド呼び出しのためのスタックの準備を行なっています。
 
 128 - 130 行でスタックを設定しています。128 行は通常の konoha メソッド呼び出しでは this オブジェクトが設定されますが、この場合は NULL オブジェクトにより簡易設定しています。
-呼び出す Konoha メソッドが this オブジェクトを使わない場合であれば、この設定で問題ありません。
+呼び出す Konoha メソッドが this オブジェクトを使わない場合であれば、これで問題ありません。
 
 そして 133 行の _KStackSetFuncAll_ マクロで呼び出しのためのスタック設定を完了し、134 行の _KStackCall_ マクロにて Konoha メソッドを呼び出します。
 
-135 行で、Konoha メソッドから戻ると _END_UnusedStack_ マクロによりスタックを呼び出し前の状態に戻します。
+Konoha メソッドから戻ると(135 行) _END_UnusedStack_ マクロによりスタックを呼び出し前の状態に戻します。
 
 
-### Konoha コールバックメソッドへ渡す引数
+#### Konoha コールバックメソッドへ渡す引数
 libevent のコールバックは次のように定義されています。
 
     /usr/include/event2/event.h
@@ -521,7 +650,7 @@ Konoha のコールバックメソッドでも同様にするため、libevent �
 
 1. 172 行 の _event_new()_ で、libevent コールバック関数として _cevent_callback_1st()_ を、コールバック引数として _keventCBArg *cbArg_ を設定
 1. イベントに応じて libevent の _libevent_dispatch()_ 等から _cevent_callback_1st()_ が _cbArg_ を引数にコールバックされる。
-1. [libevent コールバックから Konoha コールバックメソッドの呼び出し]において解説したように _cevent_callback_1st()_ 関数内の 131 行において _cbArg_ からコールバックメソッドの引数を設定して、Konoha のコールバックメソッドを呼び出す。
+1.  _cevent_callback_1st()_ 関数内の 131 行において _cbArg_ から[コールバックメソッドの引数を設定](#libevent--konoha-)して、Konoha のコールバックメソッドを呼び出す。
 
 という手順で _Konoha コールバックメソッド_ へ引数を渡しています。
 
@@ -619,8 +748,7 @@ cmake/FindLibEvent.cmake についての詳細は cmake ドキュメントを参
 -----
 
 # Lib.Libevent パッケージでのオブジェクト指向の形態への変更について
-[はじめに](https://github.com/tosnoz/konoha-tutorial-package/tree/tosnoz_edit/Lib.Libevent.Tutorial#)
-で少し触れた Konoha パッケージでのオブジェクト指向の形態への変更について簡単に説明します。
+[グルー関数の作成](#-3) で少し触れた Konoha パッケージでのオブジェクト指向の形態への変更について簡単に説明します。
 
 libevent の内部では、管理用構造体が数種類定義されており、オブジェクト(領域)を確保して使用しています。
 
