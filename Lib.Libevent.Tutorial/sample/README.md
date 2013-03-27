@@ -89,23 +89,17 @@ evBase グループに(第一引数)、
 ## signal_handler() メソッド
 signal_handler() メソッドは、その名の通りシグナル受信により呼び出される _ハンドラメソッド_ です。
 
-main() メソッドの 23, 25 行で次のように設定されています。
-
-    23		event sighup = new event(evBase, 1 /*HUP*/, signal_handler, evBase);
-    25		event sigterm = new event(evBase, 15 /*TERM*/, signal_handler, evBase);
-
 9行は、ユーザーが任意に指定する arg を メソッド内でアクセスしやすいように event_base 型にキャストしています。
 23,25行の "new event()" で指定したユーザー指定引数は event_base 型だったことに注意してください。
 
 10-12行はこのハンドラの情報を標準出力に出力しています。
-この情報表示により、スクリプトを実行してシグナル番号15(SIGHUP)を受信すると、次のような内容が標準出力に出力されます。
-
+この情報表示により、スクリプトを実行してシグナル番号1(SIGHUP), 15(SIGTERM)を受信すると、次のような内容が標準出力に出力されます。
 
     - (simpleEvent.k:10) signal_handler() executed!!
     - (simpleEvent.k:11) evBase = &0x7fe9030f8b80
     - (simpleEvent.k:12) signal = 1, evflag = 8
-※行頭の "- (simpleEvent.k:xx)" は Konoha が自動付与しているものです。
-
+	
+    ※行頭の "- (simpleEvent.k:xx)" は Konoha が自動付与しているものです。
 
 14-16行は シグナル番号15(SIGTERM) の場合の処理が記述されています。
 SIGTERM の場合には15行の evBase.event_loopbreak() が実行されるため、main() メソッドの evBase.event_dispatch() から戻りそのまま main() メソッドは return するため、このスクリプトは終了します。
